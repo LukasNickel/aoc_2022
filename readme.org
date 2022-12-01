@@ -1,0 +1,41 @@
+#+title: README
+
+
+* Why though?
+I would like to get better in emacs, but cant even understand the configs
+I copied from all over the place. There is only one way out of this:
+Learning ELISP.
+
+* How does this work?
+I will try to have one org file for each day and
+put the solution in _src_ blocks.
+That should make the solutions easy to understand.
+Most likely it will work so great, that
+I fail aoc after at most two weeks as usual.
+
+* Utils
+** Loading data
+#+name load_data
+#+begin_src elisp
+(defun read-lines (filePath)
+  "Return a list of lines of a file at filePath."
+  (with-temp-buffer
+    (insert-file-contents filePath)
+    (split-string (buffer-string) "\n" t)))
+#+end_src
+
+** Download
+Apparently this:
+
+#+name download_puzzle
+#+begin_src elisp :var day=3
+(require 'url)
+(url-copy-file (format "https://adventofcode.com/2022/day/%s/input" day) "input")
+#+end_src
+
+is not possible, because you need a session cookie as the puzzle input is personalised.
+I could do that, but actually...
+Lets just do it by hand.
+
+* Results
+- [[file:puzzles/day1.org::Part 1][Day 1]]

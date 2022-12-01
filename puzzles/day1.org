@@ -1,0 +1,241 @@
+#+title: Day1
+#+PROPERTY: header-args :session Day1 :results replace
+
+It begins!
+[[https://adventofcode.com/2022/day/1][First Puzzle]]
+
+There is a lot of very dumb/basic exploring here, which is related to the fact, that
+I don't know much about elisp.
+Also I am not really happy with the babel session and export settings yet.
+These things will hopefully get better as the challenge continues.
+
+* Load Data
+The input to the puzzle is stored under /data/day1.
+Lets try to load the data.
+
+Some considerations:
+- The values are all integers
+- Empty lines are the separator
+- We want a list of lists (for food in elf for elf in list)
+
+The way to do this in elisp is using a temporary buffer to "store" the
+file content and then dumping that into a string like this:
+
+#+begin_src elisp
+(with-temp-buffer (insert-file-contents-literally "../data/day1/test-input") (buffer-string))
+#+end_src
+
+#+RESULTS:
+#+begin_example
+1000
+2000
+3000
+
+4000
+
+5000
+6000
+
+7000
+8000
+9000
+
+10000
+#+end_example
+
+
+We now need to split this string on newlines and convert to integer.
+At the same time we need to handle the empty lines and group the values.
+
+#+begin_src elisp
+(string-to-number "42")
+#+end_src
+
+#+RESULTS:
+: 42
+
+#+begin_src elisp
+(string-to-number "")
+#+end_src
+
+#+RESULTS:
+: 0
+
+While reading more about hoiw to read the data into memory, I found this:
+https://stackoverflow.com/questions/28043763/elisp-read-file-into-list-of-lists
+
+which offers a more efficient way to read the file.
+
+Putting it together:
+
+#+begin_src elisp
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((list '()) (sublist '()))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq number (string-to-number (buffer-substring beg (point))))
+          (if (equal number 0)
+              (progn (push sublist list) (setq sublist '()))
+            (push number sublist))
+          (forward-char)))
+      (progn (push sublist list) (setq sublist '())) ;; Need one more because there is no 0 after the last one
+      (nreverse list))))
+
+(setq dummy-data (read-input "../data/day1/test-input"))
+#+end_src
+
+#+RESULTS:
+|  3000 | 2000 | 1000 |
+|  4000 |      |      |
+|  6000 | 5000 |      |
+|  9000 | 8000 | 7000 |
+| 10000 |      |      |
+
+There are still assumptions in that function.
+Notably one number per list, but that is valid at least for this first day.
+It not returns a nested list, which is hopefully what we want also for the second half of the puzzle.
+
+#+begin_src elisp
+(elt dummy-data 2)
+#+end_src
+
+#+RESULTS:
+| 6000 | 5000 |
+
+* Part 1
+We are supposed to find the largest number of calories a single elf carries.
+This means summing all the sublists (/consts).
+That would be a joke in numpy, but even by hand should be easy:
+
+#+begin_src elisp
+(defun solve-1-1 (inlist)
+(let ((largest 0))
+  (dolist (elements inlist)
+    (let ((sum 0))
+      (dolist (value elements)
+        (setq sum (+ sum value))
+        (message "%d" sum))
+      (if (> sum largest) (setq largest sum))))
+  largest
+  ))
+
+(solve-1-1 dummy-data)
+#+end_src
+
+#+RESULTS:
+: 24000
+
+That seems to work, so lets put the complete dataset in:
+
+#+begin_src elisp
+(setq data (read-input "../data/day1/input"))
+(solve-1-1 data)
+#+end_src
+
+#+RESULTS:
+: 71300
+
+which is the right answer!
+
+
+* Part 2
+This is a pretty trivial expansion:
+Instead of only the largest value, we need to keep track of the three largest ones.
+So its the same loop, but three variables and there need to be more comparisons, because
+a new value could be less than the largest one, but more than the third largest one for example.
+Some nested of statement should do the trick.
+And at the end, the sum of the three variables is needed.
+The correct answer for the dummy-data set is 45000.
+
+The three cases are:
+- Larger than all before:
+  + Becomes the new largest
+  + largest becomes second largest
+  + second largest is the new third largest
+- Larger than the second one, but smaller than the largest:
+  + Largest stays largest
+  + New one -> second
+  + second -> third
+- Larger than the third largest
+  + new one -> third
+
+Now that I think about it, there might be a smarter way to solve this.
+Maybe something like a sorted list of the three largest ones, place the new one accordingly
+and discard the last one?
+That sounds like a nice idea, but I will do it the other way for now.
+Reason being, that
+A) I am not sure how to do that (in a smart way / structure)
+B) I think it might be shorter / more readable in code, but probably the sorting thing makes it
+   less efficient?
+
+To make the code easier to reason about I want to use a cond statement like hie:
+#+begin_src elisp
+(let ((a 5))
+(cond ((eql a 1) "Equal to 1")
+      ((> a 1) "Greater than 1")
+      (t        "Something else")
+))
+#+end_src
+
+#+RESULTS:
+: Greater than 1
+
+
+I will need to nest some logic expressions for that:
+
+#+begin_src elisp
+(let ((a 5) (b 3) (c 2) (d 1))
+(cond ((> a b) "Equal to 1")
+      ((> a 1) "Greater than 1")
+      (t        "Something else")
+))
+#+end_src
+
+#+begin_src elisp
+(defun solve-1-1 (inlist)
+(let ((largest 0) (second-largest 0) (third-largest 0))
+  (dolist (elements inlist)
+    (let ((sum 0))
+      (dolist (value elements)
+        (setq sum (+ sum value)))
+        (message "%d compared to %d, %d, %d" sum largest second-largest third-largest)
+      (cond ((> sum largest)(progn
+            (setq third-largest second-largest)
+            (setq second-largest largest)
+            (setq largest sum)))
+            ((> sum second-largest)(progn
+            (setq third-largest second-largest)
+            (setq second-largest sum)))
+            ((> sum third-largest)(setq third-largest sum))
+
+        )))
+  (message "Largest three: %d, %d, %d" largest second-largest third-largest)
+  (+ largest second-largest third-largest)
+  ))
+
+(solve-1-1 dummy-data)
+#+end_src
+
+#+RESULTS:
+: 45000
+
+Tada!
+
+Evaluating the thing for the full dataset yields:
+
+#+begin_src elisp
+(solve-1-1 data)
+#+end_src
+
+#+RESULTS:
+: 209691
+
+* Post Mortem
+It would have been easier to sort once and then take the first one or three
+values.
+Oh well!
+This way I do avoid sorting, which could be expensive depending on the data, so
+there is that.

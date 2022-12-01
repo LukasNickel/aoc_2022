@@ -1,0 +1,238 @@
+% Created 2022-12-01 Do 14:57
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\usepackage[outputdir=build]{minted}
+\author{Lukas Nickel}
+\date{\today}
+\title{Day1}
+\hypersetup{
+ pdfauthor={Lukas Nickel},
+ pdftitle={Day1},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 28.2 (Org mode 9.6)}, 
+ pdflang={English}}
+\usepackage{biblatex}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+It begins!
+\href{https://adventofcode.com/2022/day/1}{First Puzzle}
+
+There is a lot of very dumb/basic exploring here, which is related to the fact, that
+I don't know much about elisp.
+Also I am not really happy with the babel session and export settings yet.
+These things will hopefully get better as the challenge continues.
+
+\section{Load Data}
+\label{sec:org184aa8e}
+The input to the puzzle is stored under /data/day1.
+Lets try to load the data.
+
+Some considerations:
+\begin{itemize}
+\item The values are all integers
+\item Empty lines are the separator
+\item We want a list of lists (for food in elf for elf in list)
+\end{itemize}
+
+The way to do this in elisp is using a temporary buffer to ``store'' the
+file content and then dumping that into a string like this:
+
+\begin{minted}[]{elisp}
+(with-temp-buffer (insert-file-contents-literally "../data/day1/test-input") (buffer-string))
+\end{minted}
+
+
+We now need to split this string on newlines and convert to integer.
+At the same time we need to handle the empty lines and group the values.
+
+\begin{minted}[]{elisp}
+(string-to-number "42")
+\end{minted}
+
+\begin{minted}[]{elisp}
+(string-to-number "")
+\end{minted}
+
+While reading more about hoiw to read the data into memory, I found this:
+\url{https://stackoverflow.com/questions/28043763/elisp-read-file-into-list-of-lists}
+
+which offers a more efficient way to read the file.
+
+Putting it together:
+
+\begin{minted}[]{elisp}
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((list '()) (sublist '()))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq number (string-to-number (buffer-substring beg (point))))
+          (if (equal number 0)
+              (progn (push sublist list) (setq sublist '()))
+            (push number sublist))
+          (forward-char)))
+      (progn (push sublist list) (setq sublist '())) ;; Need one more because there is no 0 after the last one
+      (nreverse list))))
+
+(setq dummy-data (read-input "../data/day1/test-input"))
+\end{minted}
+
+There are still assumptions in that function.
+Notably one number per list, but that is valid at least for this first day.
+It not returns a nested list, which is hopefully what we want also for the second half of the puzzle.
+
+\begin{minted}[]{elisp}
+(elt dummy-data 2)
+\end{minted}
+
+\section{Part 1}
+\label{sec:orge0aa6b8}
+We are supposed to find the largest number of calories a single elf carries.
+This means summing all the sublists (/consts).
+That would be a joke in numpy, but even by hand should be easy:
+
+\begin{minted}[]{elisp}
+(defun solve-1-1 (inlist)
+(let ((largest 0))
+  (dolist (elements inlist)
+    (let ((sum 0))
+      (dolist (value elements)
+        (setq sum (+ sum value))
+        (message "%d" sum))
+      (if (> sum largest) (setq largest sum))))
+  largest
+  ))
+
+(solve-1-1 dummy-data)
+\end{minted}
+
+That seems to work, so lets put the complete dataset in:
+
+\begin{minted}[]{elisp}
+(setq data (read-input "../data/day1/input"))
+(solve-1-1 data)
+\end{minted}
+
+which is the right answer!
+
+
+\section{Part 2}
+\label{sec:org1eacb2f}
+This is a pretty trivial expansion:
+Instead of only the largest value, we need to keep track of the three largest ones.
+So its the same loop, but three variables and there need to be more comparisons, because
+a new value could be less than the largest one, but more than the third largest one for example.
+Some nested of statement should do the trick.
+And at the end, the sum of the three variables is needed.
+The correct answer for the dummy-data set is 45000.
+
+The three cases are:
+\begin{itemize}
+\item Larger than all before:
+\begin{itemize}
+\item Becomes the new largest
+\item largest becomes second largest
+\item second largest is the new third largest
+\end{itemize}
+\item Larger than the second one, but smaller than the largest:
+\begin{itemize}
+\item Largest stays largest
+\item New one -> second
+\item second -> third
+\end{itemize}
+\item Larger than the third largest
+\begin{itemize}
+\item new one -> third
+\end{itemize}
+\end{itemize}
+
+Now that I think about it, there might be a smarter way to solve this.
+Maybe something like a sorted list of the three largest ones, place the new one accordingly
+and discard the last one?
+That sounds like a nice idea, but I will do it the other way for now.
+Reason being, that
+\begin{enumerate}
+\item I am not sure how to do that (in a smart way / structure)
+\item I think it might be shorter / more readable in code, but probably the sorting thing makes it
+less efficient?
+\end{enumerate}
+
+To make the code easier to reason about I want to use a cond statement like hie:
+\begin{minted}[]{elisp}
+(let ((a 5))
+(cond ((eql a 1) "Equal to 1")
+      ((> a 1) "Greater than 1")
+      (t        "Something else")
+))
+\end{minted}
+
+
+I will need to nest some logic expressions for that:
+
+\begin{minted}[]{elisp}
+(let ((a 5) (b 3) (c 2) (d 1))
+(cond ((> a b) "Equal to 1")
+      ((> a 1) "Greater than 1")
+      (t        "Something else")
+))
+\end{minted}
+
+\begin{minted}[]{elisp}
+(defun solve-1-1 (inlist)
+(let ((largest 0) (second-largest 0) (third-largest 0))
+  (dolist (elements inlist)
+    (let ((sum 0))
+      (dolist (value elements)
+        (setq sum (+ sum value)))
+        (message "%d compared to %d, %d, %d" sum largest second-largest third-largest)
+      (cond ((> sum largest)(progn
+            (setq third-largest second-largest)
+            (setq second-largest largest)
+            (setq largest sum)))
+            ((> sum second-largest)(progn
+            (setq third-largest second-largest)
+            (setq second-largest sum)))
+            ((> sum third-largest)(setq third-largest sum))
+
+        )))
+  (message "Largest three: %d, %d, %d" largest second-largest third-largest)
+  (+ largest second-largest third-largest)
+  ))
+
+(solve-1-1 dummy-data)
+\end{minted}
+
+Tada!
+
+Evaluating the thing for the full dataset yields:
+
+\begin{minted}[]{elisp}
+(solve-1-1 data)
+\end{minted}
+
+\section{Post Mortem}
+\label{sec:org212c206}
+It would have been easier to sort once and then take the first one or three
+values.
+Oh well!
+This way I do avoid sorting, which could be expensive depending on the data, so
+there is that.
+\end{document}

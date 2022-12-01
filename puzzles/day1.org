@@ -239,7 +239,7 @@ Tada!
 
 Evaluating the thing for the full dataset yields:
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (solve-1-1 data)
 #+end_src
 

@@ -1,5 +1,5 @@
 #+title: Day1
-#+PROPERTY: header-args :session Day1 :results replace
+#+PROPERTY: header-args :session Day1 :exports both
 
 It begins!
 [[https://adventofcode.com/2022/day/1][First Puzzle]]
@@ -22,7 +22,9 @@ The way to do this in elisp is using a temporary buffer to "store" the
 file content and then dumping that into a string like this:
 
 #+begin_src elisp
-(with-temp-buffer (insert-file-contents-literally "../data/day1/test-input") (buffer-string))
+(with-temp-buffer
+  (insert-file-contents-literally "../data/day1/test-input")
+  (buffer-string))
 #+end_src
 
 #+RESULTS:
@@ -62,9 +64,10 @@ At the same time we need to handle the empty lines and group the values.
 : 0
 
 While reading more about hoiw to read the data into memory, I found this:
-https://stackoverflow.com/questions/28043763/elisp-read-file-into-list-of-lists
+[[https://stackoverflow.com/questions/28043763/elisp-read-file-into-list-of-lists]]
 
-which offers a more efficient way to read the file.
+which offers a more efficient way to read the file by not using the literal content,
+but by iterating through the file.
 
 Putting it together:
 
@@ -96,7 +99,9 @@ Putting it together:
 
 There are still assumptions in that function.
 Notably one number per list, but that is valid at least for this first day.
-It not returns a nested list, which is hopefully what we want also for the second half of the puzzle.
+It now returns a nested list, which is hopefully what we want also for the second half of the puzzle.
+
+This is what is in the third (zero-index) element:
 
 #+begin_src elisp
 (elt dummy-data 2)
@@ -171,7 +176,7 @@ A) I am not sure how to do that (in a smart way / structure)
 B) I think it might be shorter / more readable in code, but probably the sorting thing makes it
    less efficient?
 
-To make the code easier to reason about I want to use a cond statement like hie:
+To make the code easier to reason about I want to use a cond statement like this:
 #+begin_src elisp
 (let ((a 5))
 (cond ((eql a 1) "Equal to 1")
@@ -184,15 +189,23 @@ To make the code easier to reason about I want to use a cond statement like hie:
 : Greater than 1
 
 
-I will need to nest some logic expressions for that:
+At first I thought I would need to nest some logical expressions, but
+they are mutually exclusive (It does not check the second block if it went into the first one).
+This will not come as a surprise for anyone, but hey: I havent used logic in a while (at all, no constraints),
+so have to get used to it.
 
 #+begin_src elisp
-(let ((a 5) (b 3) (c 2) (d 1))
-(cond ((> a b) "Equal to 1")
-      ((> a 1) "Greater than 1")
+(let ((a 5) (b 3) (c 2))
+(cond ((> a b) "Greater than b")
+      ((> a c) "Greater than c")
       (t        "Something else")
 ))
 #+end_src
+
+#+RESULTS:
+: Greater than b
+
+The final solution for the second part of day 1 then becomes:
 
 #+begin_src elisp
 (defun solve-1-1 (inlist)

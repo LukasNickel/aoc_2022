@@ -21,7 +21,7 @@ Some considerations:
 The way to do this in elisp is using a temporary buffer to "store" the
 file content and then dumping that into a string like this:
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (with-temp-buffer
   (insert-file-contents-literally "../data/day1/test-input")
   (buffer-string))
@@ -49,14 +49,14 @@ file content and then dumping that into a string like this:
 We now need to split this string on newlines and convert to integer.
 At the same time we need to handle the empty lines and group the values.
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (string-to-number "42")
 #+end_src
 
 #+RESULTS:
 : 42
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (string-to-number "")
 #+end_src
 
@@ -103,7 +103,7 @@ It now returns a nested list, which is hopefully what we want also for the secon
 
 This is what is in the third (zero-index) element:
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (elt dummy-data 2)
 #+end_src
 
@@ -115,7 +115,7 @@ We are supposed to find the largest number of calories a single elf carries.
 This means summing all the sublists (/consts).
 That would be a joke in numpy, but even by hand should be easy:
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (defun solve-1-1 (inlist)
 (let ((largest 0))
   (dolist (elements inlist)
@@ -135,7 +135,7 @@ That would be a joke in numpy, but even by hand should be easy:
 
 That seems to work, so lets put the complete dataset in:
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (setq data (read-input "../data/day1/input"))
 (solve-1-1 data)
 #+end_src
@@ -207,7 +207,7 @@ so have to get used to it.
 
 The final solution for the second part of day 1 then becomes:
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (defun solve-1-1 (inlist)
 (let ((largest 0) (second-largest 0) (third-largest 0))
   (dolist (elements inlist)

@@ -4,7 +4,7 @@
 [[https://adventofcode.com/2022/day/2][Link to Puzzle]]
 
 * Data
-I keep them as chars for now, could of course use integers as well.
+I keep them as strings for now, could of course use integers as well.
 But lets keep the data intact for now since I have no idea what the
 second part will be.
 
@@ -93,9 +93,10 @@ But subtracting the offset would still be good to test equality:
 #+RESULTS:
 : t
 
+
 #+begin_src elisp
 (defun fight (elv santa)
-    (let ((points 0) (elv_val (- elv 64)) (santa_val (- santa 87))) ;; one less so that rock is 1 not 0
+    (let ((points 0) (elv_val (- elv ?A -1)) (santa_val (- santa ?X -1))) ;; one less so that rock is 1 not 0
     (cond ((equal elv_val santa_val) (setq points (+ 3 santa_val))) ;; draw
           ((or (and (equal elv_val 1) (equal santa_val 2)) (and (equal elv_val 2) (equal santa_val 3)) (and (equal elv_val 3) (equal santa_val 1))) ;; win
            (setq points (+ 6 santa_val)))
@@ -103,7 +104,7 @@ But subtracting the offset would still be good to test equality:
     (message "%s" points)
     points))
 
-(fight 65 88)
+(fight ?A ?X)
 #+end_src
 
 #+RESULTS:
@@ -115,12 +116,14 @@ Just the right amount of brackets, perfectly balanced as all things should be.
 Does this actually work now?
 We still need to add the loop:
 
+__Note__:
+Since these are still strings, each pairing is actually "elv whitespace santa".
 #+begin_src elisp
-(elt (elt dummy-input 0) 0)
+(elt (elt dummy-input 0) 1)
 #+end_src
 
 #+RESULTS:
-: 65
+: 32
 
 #+begin_src elisp :exports both
 (defun solve-2-1 (data)
@@ -159,22 +162,22 @@ part 1. You would need some "wrapping-around"...
 That is really just a modulo...
 I feel stupid sometimes.
 
-If santa wins, he needs the "next one in line". So its 2 if elves chose 1, 3 if thy chose 2 and 1 if they chose 3.
+If santa wins, he needs the "next one in line". So its 2 if elves chose 1, 3 if they chose 2 and 1 if they chose 3.
 
-#+begin_src elisp
-(mod -1 3)
-#+end_src
+__Note__:
+There is one small adoption we need to make in order for this to work:
+Previously, I mapped (Rock, Paper, Scissor) to (1,2,3), but now we need
+(0,1,2).
+This is to make sure we get a valid result out of the modulo.
+Of course we then need to add one again afterwards to get the correct points.
 
-#+RESULTS:
-: 2
 
 #+begin_src elisp :exports both
 (defun fight-2 (elv santa)
-    (let ((points 0) (elv_val (- elv 65)) (santa_val (- santa 89))) ;; 89 so that losing decrements
-    (cond ((equal santa 88) (setq points (+ 0 points))) ;; lose. Dont really need this, but its nice for clarity
-          ((equal santa 89) (setq points (+ 3 points))) ;; draw
-          ((equal santa 90) (setq points (+ 6 points)))) ;; win
-    (message "%s %s %s" elv_val santa_val (mod (+ santa_val elv_val) 3) )
+    (let ((points 0) (elv_val (- elv ?A)) (santa_val (- santa ?Y))) ;; 89 so that losing decrements
+    (cond ((equal santa_val -1) (setq points (+ 0 points))) ;; lose. Dont really need this, but its nice for clarity
+          ((equal santa_val 0 ) (setq points (+ 3 points))) ;; draw
+          ((equal santa_val 1) (setq points (+ 6 points)))) ;; win
     (+ points 1 (mod (+ elv_val santa_val) 3))))
 
 (fight-2 ?A ?X)
@@ -195,17 +198,25 @@ If santa wins, he needs the "next one in line". So its 2 if elves chose 1, 3 if 
 #+RESULTS:
 : 12
 
-#+begin_src elisp
+#+begin_src elisp :exports both
 (solve-2-2 input)
 #+end_src
 
 #+RESULTS:
 : 15442
 
+And this in fact the correct result.
 
-#+begin_src elisp
-(message "%s %s %s %s %s %s " (fight-2 ?A ?X) (fight-2 ?A ?Y) (fight-2 ?A ?Z) (fight-2 ?B ?X) (fight-2 ?B ?Y) (fight-2 ?B ?Z))
-#+end_src
+* Post Mortem
+I am relatively happy with the outcome.
+The -1 in the first part is really pointless and should just be added at the end like in part 2.
 
-#+RESULTS:
-: 0 4 8 1 5 6
+Apart from that I am a bit confused by how elisp turns strings into lists and characters.
+
+Also knowing the second part, the input parsing could also handle more of the ascii magic
+and turn everything into suitable integers and return them as a list instead of a string
+with a whitespace in the middle.
+
+Instead of the ascii calculations, one could also use an alist or function for the mapping.
+That would probably more "production-suitable", but I went this way by choice, because I
+wanted to test it out.

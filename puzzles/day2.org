@@ -1,0 +1,211 @@
+#+title: Day2
+#+PROPERTY: header-args :session Day2 :exports both
+
+[[https://adventofcode.com/2022/day/2][Link to Puzzle]]
+
+* Data
+I keep them as chars for now, could of course use integers as well.
+But lets keep the data intact for now since I have no idea what the
+second part will be.
+
+#+begin_src elisp :noweb yes
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((list '()))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (push line list)
+          (forward-char)))
+      (nreverse list))))
+(setq dummy-input (read-input "../data/day2/dummy-input"))
+#+end_src
+
+#+RESULTS:
+| A Y | B X | C Z |
+
+* Part 1
+So, we need to have three parts:
+- Decide who wins in a round
+- Calculate the points
+- Repeat for all rounds
+
+I feel like there is a very smart way to do this given that
+the mapping of (Rock, Paper, Scissor) follows the same
+order for both sets of chars:
+The "smallest" one is rock, the next one paper, the last one scissor.
+And the points given are also increasing in the same order.
+
+Maybe one can just use the ascii index, subtract the difference
+between A and X and compare these.
+Then we are also very close to the points given already.
+Actually in Elisp, a char is already an integer basically.
+
+But A is not 0, right?
+Lets just check:
+
+#+begin_src elisp :exports both
+'(?A ?B ?C ?X ?Y ?Z)
+#+end_src
+
+#+RESULTS:
+| 65 | 66 | 67 | 88 | 89 | 90 |
+
+Ok, so we would have to substract another 65. Probably a number one could have in ones
+head, but...
+
+And then another offset for the "encrypted answers"
+#+begin_src elisp :exports both
+(- ?X ?A)
+#+end_src
+
+#+RESULTS:
+: 23
+
+This is very likely not the easiest way.
+- One could do all this during the loading step
+- I am not sure whether there are even better methods in elisp for this
+
+What I am also not quite sure yet, is how elisp differentiates between
+chars and strings. Like how would I set the value of a variable to a char?
+Or how do I get the value of a string consisting of a single char like in this
+case?
+
+__Breaking News__:
+This will not be sufficient anyway.
+Rock beats Scissors, so 0>2?
+Need some cond statement anyway...
+
+But subtracting the offset would still be good to test equality:
+#+begin_src elisp
+(elt "X" 0)
+#+end_src
+
+#+RESULTS:
+: 88
+
+#+begin_src elisp :export both
+(equal (elt "A" 0) (- (elt "X" 0) 23))
+#+end_src
+
+#+RESULTS:
+: t
+
+#+begin_src elisp
+(defun fight (elv santa)
+    (let ((points 0) (elv_val (- elv 64)) (santa_val (- santa 87))) ;; one less so that rock is 1 not 0
+    (cond ((equal elv_val santa_val) (setq points (+ 3 santa_val))) ;; draw
+          ((or (and (equal elv_val 1) (equal santa_val 2)) (and (equal elv_val 2) (equal santa_val 3)) (and (equal elv_val 3) (equal santa_val 1))) ;; win
+           (setq points (+ 6 santa_val)))
+          (t (setq points santa_val))) ;;loss
+    (message "%s" points)
+    points))
+
+(fight 65 88)
+#+end_src
+
+#+RESULTS:
+: 4
+
+I knew, you would love it, Stefan!
+Just the right amount of brackets, perfectly balanced as all things should be.
+
+Does this actually work now?
+We still need to add the loop:
+
+#+begin_src elisp
+(elt (elt dummy-input 0) 0)
+#+end_src
+
+#+RESULTS:
+: 65
+
+#+begin_src elisp :exports both
+(defun solve-2-1 (data)
+  (let ((result 0))
+  (dolist (pairing data) (setq result (+ result (fight (elt pairing 0) (elt pairing 2)))))
+  result))
+
+(solve-2-1 dummy-input)
+#+end_src
+
+#+RESULTS:
+: 15
+
+You might have noticed, that there is some weird stuff going on with the indexing.
+I did too.
+
+Run it on all data:
+#+begin_src elisp
+(setq input  (read-input "../data/day2/input"))
+
+(solve-2-1 input)
+#+end_src
+
+#+RESULTS:
+: 15422
+
+* Part 2
+Huh...
+Well, then that would make the logic easier, right?
+In any case, I need to rewrite my fight function since I had that "deconding" logic embedded into that.
+
+Actually: The result is calculated based on santas choice which I first need to decipher.
+But that should be very easy if done properly. Its the same problem, that I dit not solve in
+part 1. You would need some "wrapping-around"...
+
+That is really just a modulo...
+I feel stupid sometimes.
+
+If santa wins, he needs the "next one in line". So its 2 if elves chose 1, 3 if thy chose 2 and 1 if they chose 3.
+
+#+begin_src elisp
+(mod -1 3)
+#+end_src
+
+#+RESULTS:
+: 2
+
+#+begin_src elisp :exports both
+(defun fight-2 (elv santa)
+    (let ((points 0) (elv_val (- elv 65)) (santa_val (- santa 89))) ;; 89 so that losing decrements
+    (cond ((equal santa 88) (setq points (+ 0 points))) ;; lose. Dont really need this, but its nice for clarity
+          ((equal santa 89) (setq points (+ 3 points))) ;; draw
+          ((equal santa 90) (setq points (+ 6 points)))) ;; win
+    (message "%s %s %s" elv_val santa_val (mod (+ santa_val elv_val) 3) )
+    (+ points 1 (mod (+ elv_val santa_val) 3))))
+
+(fight-2 ?A ?X)
+#+end_src
+
+#+RESULTS:
+: 3
+
+#+begin_src elisp :exports both
+(defun solve-2-2 (data)
+  (let ((result 0))
+  (dolist (pairing data) (setq result (+ result (fight-2 (elt pairing 0) (elt pairing 2)))))
+  result))
+
+(solve-2-2 dummy-input)
+#+end_src
+
+#+RESULTS:
+: 12
+
+#+begin_src elisp
+(solve-2-2 input)
+#+end_src
+
+#+RESULTS:
+: 15442
+
+
+#+begin_src elisp
+(message "%s %s %s %s %s %s " (fight-2 ?A ?X) (fight-2 ?A ?Y) (fight-2 ?A ?Z) (fight-2 ?B ?X) (fight-2 ?B ?Y) (fight-2 ?B ?Z))
+#+end_src
+
+#+RESULTS:
+: 0 4 8 1 5 6

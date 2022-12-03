@@ -1,0 +1,139 @@
+#+title: Day3
+#+PROPERTY: header-args :session Day3 :exports both
+
+* Part 1
+
+Since we need each line to be split, I do that while reading the data.
+
+#+begin_src elisp :exports both
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((list '()))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (let ((half (/ (length line) 2)))
+          (push (cons (substring line 0 half) (substring line half) ) list))
+          (forward-char)))
+      (nreverse list))))
+(setq dummy-input (read-input "../data/day3/dummy-input"))
+#+end_src
+
+#+RESULTS:
+: ((vJrwpWtwJgWr . hcsFMMfFFhFp) (jqHRNqRjqzjGDLGL . rsFMfFZSrLrFZsSL) (PmmdzqPrV . vPwwTWBwg) (wMqvLMZHhHMvwLH . jbvcjnnSBnvTQFn) (ttgJtRGJ . QctTZtZT) (CrZsJsPPZsGz . wwsLwLmpwMDw))
+
+
+
+We will need to find duplicates for each pair in any rucksack.
+I do that by checking each character of the second string versus the first string.
+This might not be the fastest way (?), but it works fine.
+
+#+begin_src elisp :exports both
+(defun find-duplicate (list1 list2)
+  (let ((iterator (append list2 nil)))
+    (dolist (char iterator)
+      (if (string-search (char-to-string char) list1)(return char)))))
+
+(find-duplicate (car (elt dummy-input 0)) (cdr (elt dummy-input 0)))
+#+end_src
+
+#+RESULTS:
+: 112
+
+We will then need to calculate the priority of each "value".
+This is the most basic, not at all a good general solution:
+
+#+begin_src elisp :exports both
+(defun char-to-prio (x)
+  (if (> x 96)(- x 96) ;;lower case
+    (- x 38) ;;upper case
+        ))
+
+(char-to-prio ?a)
+#+end_src
+
+#+RESULTS:
+: 1
+
+Load the input data:
+
+#+begin_src elisp
+(setq input (read-input "../data/day3/input"))
+#+end_src
+
+#+RESULTS:
+: ((JppMDcJP . cQbqGqFb) (ZStgnHtsSj . GBhqFbBmsm) (djzzwgHHggdnfwjt . MPDPMGpPlNfpLDll) (dRCtwtlCSttPtlNPNtgvP . rDqmBsjGSpjBBsJsqqmrp) (ZhWnZhzMMfnWWT . DzBrmsmjsBccJB) (TFQMrZrMfZrLZZnLQ . dlvNdCgdHPlCllHNF) (PVddPnZWDDPqmHZzqVPzqdHd . MRMJjQtvmvjvtTQQtlRtbbQl) (fsNswFpChpNwfg . tMvCbjTRJBbtRj) (SFgfSMShLcsLgNMFhpwShFF . ZPHqZGZPqHdzPZHZcdzDDqd) (dHffzCqSfJCCzCPvdcpz . RrBDDBSBBBMtthDDrFMT) (bVsZbsrgbWs . hBTFtDTtZTD) (slWGNbNWgWwnmNnwgnlGj . dJJdPHcvcrcHjqPzdqPvp) (vBFBzGvGBvjFpGWcvCCvBvG . PPhZbgLhMnhrPgFgPFgLLPF) (dVlslfdJNVJJmQQwdNRNw . LZZZrrqhbPbZndpdgMhLP) (HJRHJpNJlVmftHfNQNRsHmm . GCtGWjGDDTvCzcjWDStvcvT) (cVQzCCCpVVjgHs . NwwFRqSRSRRtNH) (PWfhfPhbWWdWllPDdTvdbnvh . LJLLMJFTSNwJtMRwJLqJJNMq) (DnfblllPbDrbWmbdPFdvlhd . gQzzZZzQgcpcsZGcGQQgcpr) (hdFnnrdLnJRr . ZMzVlMbrwZvz) (TgfjGCcfsqfqqBf . RMPDVvVVvTZRPbP) (qQqffcGStBSCQcsqCCBRjGq . WhHFptFdnhNLmhnLWmphLLt) (WHPqWhLWHBMqdd . CdtDRwStDSwgnw) (rfCfZTmvpvvpFVfFrbvTbvc . gtwgtStntggwbSJttgJtwgw) (fpQFsmfFmfZcrF . CMhWNQWLCzhhCM) (zdqqJHDWwqNNZ . jQSmtdjpmfnjj) (GFBcPfBLPThcTcLRb . pTQQjpTQrjSnQjlvn) (MFVLcsPVbPcRGfVPFR . gDzJsHZNDCZNCNZsHg) (WQdMhlmQMwfZlQdgdHfdd . vtzmbJbcsctbBJqqcvqzB) (rSTrDDCSSGRCnnSGww . zJsbBvJsCCttccsvsz) (VnFwDrNwPwVSDrL . gjfZZdMQFMWgljQ) (rJNjBLNQjvLQjFFLQJCFTv . GWlRRgfGWDWlCDzlGnRRWG) (tMMhShhwhbgp . lflwDlnnnzDH) (ZcSZVMSqshh . QBQqQvqQgjJ) (btTtWGbvtcv . HHccdNRhHdl) (TDzqLPSqBzqVS . ldPddHhhNNlRQ) (jBLDqDgZZBzJJ . msbWjppmmpTWw) (LLDTRRfTwZRGZfDCRTwR . sVHsVFBVZVlmVFBFlFJl) (QjWpQrzQcbhfMqr . VVHVPFslFVpVmHH) (hqhzqMfNvjvMMzh . dRDdCwGDSSdnvRn) (jmMdNCLjLmJ . PtHtSHhSVVJ) (pDBqgBgCvbfGBBbC . GHZhtQZtPHVSVHPV) (pBnWgBpzWzBbWDWvzwpgCvq . cmLNTrdLmmrnRLTrmrTdmLd) (dRWWtRGB . DPQctQDZ) (CMfnCfFMmTTFVCmfmTLvsnM . PZjccHRcPrRPsZQQZPQDRrQ) (fLCffmRTCvRnmTllzVv . pdpphNJggpGbJJJpdlh) (cfsfbbWqqZqDScbhGD . PDjTPmpVtmmPjPntFD) (dCBBCRQCHNHLMQvrJJJBJLr . GPMnjVtPjVMmnjPFmPmMpFn) (HvRGLddgHHv . qhwzbWhcgcf) (DHmhhDDhbqrRhvbrHqhPbPv . BwwWwTmMGTVwwBMGWVNNwVw) (gSzJjnnjsscfcsZcSf . WwQGdMMcWTBcTTMTMw) (nsFCCFZsnSlCFBFflfflsz . tRPCqvvHPttRbHbhvPrrRr) (SGNRLzpNpgNSNNlWFNw . zqJfHfJHBtBdJhBJrHd) (bQnjPTnjV . dZtPPrfLP) (TTnTccLnj . GFcDNggFl) (lBJmNzJlzmmQBlzgV . VjLWRDfLjRsRLWWRS) (vTMvTvtrfdhrrrPTdZwTTwt . DqSSnWFWDFMMsRssjjsRqWD) (ZpbvHbZddtbrdrdh . cBmmpGQfBQgJNcmz) (qsmhTmTVcDdc . ffhPhPvvzFhF) (BNNlJbjWBWjtRtNljbmBBC . pFzPlFPgpPfwFnlffnlPgg) (JtBmmrrrRb . DSrVqDqVSD) (VmSgpSLgJjVD . MrFrmMlfFmsG) (bZWhZbzWcCwTWPRCwwwSPQzw . MHnflHnGsMGnTrsflGMnlfTF) (CqWhWqWCCWRRZQc . LqDLpVDDLNStpgD) (JwzTVzzcLzVJVVlJpVTwzGc . rWhFjqsBjCjQFjWcCCjCjBF) (MDSNQMtbSSnSbgbRDvnRNgv . hmrqrjBCBtmCrCCWFqthhWm) (bgMfNSSNZ . TwZQddGJZ) (jjPgbFjjStjjPcSbrbt . pvNrGnGDvBnMGvNDNGG) (LwdZwsTdWTTmw . DNCNppGBsnpBR) (mWmHwZWhTTJWHBdQQWB . jcFczSgjlSftjbtQPzg) (fCBlrffzlCzcmfLDlf . gRRnHScsHvRSQHMQvs) (LthpZqtpVThZhGJtqTF . vHsVnvsvMsggjHQjgQH) (ZWFWGTLTW . BNCWfDfmD) (BpFqJrpcZZB . DhDsNqMHhRG) (zwlzPdmzPL . hwvhMgsHnN) (mPlWjlQfQjjllWtjQCWzC . rBFJFTBcSNcJbbZfcZJSb) (FpzNFTThBDChnnzNBCBNDz . WGndgWqbJWVGqmPbJqQgQm) (HQRctcvw . gddVcJGd) (LwRMZLjQfSRj . FNzFSrhNsThS) (WgRWVLWhFqgqgcgWHqLRWHVR . bbbNwBmtBcNcwdwwBNwBzwBN) (pSfssjDSrSvJp . NJCztbJBtMNbt) (TzsvGGnjGPsPjSTpDrPfPDS . HhWqLgZZVHVhZZZZVQQFLnZ) (sHjtPjQTt . DbsfrrqWR) (ZmccchvlvSvvZNMVNhvB . LWRJJblWJWJlJfwHbwlL) (hMMBzSMppVSzSNNmN . gHjPgGPFTCpTTgTgG) (rPQpCPPCQQZd . cFhcZgzVJgwt) (vDBSHmvHSSMlDWWmljnHBv . FwzzcrwhVSJwVFtzcJJghw) (bmmrsrsbsv . NdCTdbPTdb) (NgzBnsBNnfjgNvvfvW . btShSSFSMLJMFjjbPh) (CCcRHdlQr . QPLTJPLGP) (HrDlRcqcDJCCDJHlcplrDJD . fgfzBWWNZfvsnNqWwngZWwW) (TggFVbjVTVzRwFFjj . qBBqpzNztqcQqNNqN) (SnZPrWndmShSZSPsnSLs . JhpMQpcJtNqBClltqctC) (mfWsGdnZZWmZmrLSfsrnmP . ggwtggRgGTVHvRwgFDjTGT) (wQMZFQwppbPHPb . LQJsgQNJJmBnds) (qrSGvRRCvTzT . DNnhNgmCgdBm) (qzRrcRlGjvvzlzrvjcGqSSz . MHWwVdPMWFpFMHMHWlPWMVV) (BccsFzrBcsfpccccgFm . QqlGNqCTLTlQnqgLlRG) (MZbVSMddddSPPtdHPVJPJd . TllqLNLGGTNCCRhTnHTQHh) (DMwtbVZDZbSb . pprcpccppwrq) (bSZTdNqF . jjzjqQMQ) (WtRztLsWJpPLz . rsMDlDQjMhVMC) (pcgHRpHmWPJgLRzBJHBPPRB . fvvfGNGvvFwfvSvfTmNNZfN) (RjvBljWTTWTlqmBvHjG . ptRgccZcbPtcttbpzbn) (VhDSDdJLJpSNNVV . znPzzzSzcZFngZt) (LsMdQNVM . HsBHjqps) (rSPSLTnS . CClfSFCR) (MwtZgwNBzzTjzZMbbmjNtwmB . cRvFqQllqtQRlFRVqRqVVcvq) (TsMhZsjNjBbTbBbwZ . LpDnHdDGdHWnpGHnh) (LfdssTFBjFHSwl . hzCcZZgMMfMhZZ) (DmtDvrpmNStVvqp . PczrZMMhZhhChCC) (vJtJpQWvNVDt . JFbHlJSlBbSF) (PgvHLbcgRcGGHzRvgGgchBz . sCZnmNZmZddrCrvdddZCZrF) (JQBMjlStJ . rQsZFrNCZ) (JSJTlqMtjptlplSSqJVDBqp . hwhhwHRPRggGbGzHbgzVRPH) (pBsztsZdBsnWhntVnhtV . TqTWNQlGGTGGFFlQFlTl) (fDvLSMcbDbfMr . GqFqSGwSQPzqz) (zjcvLMMvffLjgggzfjjJCCLc . dBtRphddBmmZBpCZZpZpmmhs) (gmmSDplcPHDfHDl . bVNrtCtCCNqHvTn) (QGwJjzdPMzJhFLw . nbvMqrTVCCMnvMv) (LQQZdGjGdJhFBFQGjLGBJzz . sBSWcPflllcfmDmfBsmBWPs) (sMppbLDRMQbrTD . TJjwcqnfnjwwnw) (CgmFgSPHPzHgdmJWZZFzCzZZ . cVnGGnttWtVVVnccfjVqwVff) (PhCChPSNgPgPJhPHhFZg . sDNRspsvMNQLRvNDvpbD) (pHnVnlRGVp . fgpfgCpCTz) (LCNQPqZCqNSSZCS . tzPgTmztwPfzwzT) (dbSqhjhqQhNLQLFjLj . GvFcRnCcsvRVvvsFnG) (QTdnDTDQbCnMdbqdw . SmJBljFJZhttJZMSh) (HfNfLNzGLsgW . BpGJthlZFBSB) (ssRPHPfNsWHzZZvrvHfgLzN . wnbbVVRwwRbVVcqDTddCVdD) (ZhZBrJssjrNs . bRtWpjwjlmlm) (qTfHzGTfTGqqLGMdCC . RcmmRRZcbPMccWmcRw) (dVCZdDHdGHQ . hBVNJSsBhBF) (NsplbGDbblHcbCpDlDGDPlPp . JjdrVjgrvHnghvVdJrJdvvdn) (tQFMZNWSmWFQRzQSwtzFmwFF . JdVBghVrnBjVjBgrvVjMvrhJ) (FFRmFZZRzQRmFLQSZZWQWF . CPCNGcTCpGpfGfLTpblpff) (dnhQHqQCnqWwNQCwC . RRdJjjJVVPmVVJsJP) (LccFRDgfMgLFB . JVlmVVmgjrPzZ) (pvfGpRpSp . TnTQbvbTv) (nwNlWwhWwNmJv . QQdzdzZGMqDzn) (rcVscPfrLcfvjTFc . QDqGdZqMzMSHZHjS) (LsfbbFcvV . gRRblJRNR) (Rmrrlmlt . cffhllfl) (DDZMMMFZVsFsWZDSH . hPPfgQbPPnQgcHctf) (zGMGSBVDW . CrvwjtBvm) (DCZHwdDwNNGNZDZCjj . tpTHLvtlgLbRLttlTL) (BzPzBJffJJ . QgLlRgGztQ) (PJffcJhJf . NNSwFhGZC) (blplfHbwZSfbcbwSbfVSHDHc . NvdrvrWsCrvWVCRWnvNndtWW) (hQzBTQLLM . BWBsnsnNC) (zMsgTjqT . qPpZHbfp) (ZLNNLtfZhRJQtpQhNRttZRq . cGFcqGBzjrcqclGScFljjcj) (VnvVVPMWHwgJCMv . wdcGFdFrGcwzGBG) (WHgPJJvWVTgnvgvTHmWCH . msNZRtNRDZpfZQffZZssR) (rZgMFMVVjGbVSqZb . hftLRDmCGRCNDCtm) (cdddQzdWsWnQvzscn . fRHmfnDNtLNChRmfH) (zplDQdDzwszlDsWdPcldz . MFFrFrBFgpqVBZgSgZFrF) (gbzfbTvbJgbvzvTvJvJmzvjc . BBQSfWDLCSBQQfLZWSCdBHHD) (GhnMhsGrMNPPwnwsRPNsF . CZDWHZdWBWHdrZLdCHBBC) (PsnGsssGNsNRFsLGwMVN . ccJVmbjcjJblbzTVjlTz) (RfBqNfVmPLTTTVR . ZMMBWjlMvBgbbMs) (rHJzDwJdHz . QgbMQlWMhd) (HtJrpCcH . flLPFfpq) (SSGtmjQFStDbQbqGW . JNnpZwgPsZjnJNNfZ) (RdClRMhlldHdlvdTh . NgwfJNRspNwJpwZcN) (CMBLgvvBLhrrBHTCVVLB . QrWtbrDGmbtWGtzDQFGb) (ZRRCqHpR . dztLSqWz) (hRsGjMVccGshPVDVcB . mfgFFzggFgfBmWWtSd) (PVjlGhcGJjGPsGMjjDVrM . TpRnvRZlHnZNNQbHppTTC) (QjbjWWlndRbwwwQWQd . tpTVVZtzRPhHDzThhP) (fFfLsvrLCrmvGlSfLSrl . PHThDzTztHVtzDzGtTVh) (fvrgsfccFLLLSvfMCCS . WBjdMqdqNWBdBQNnWld) (pjGPvvbllvqGvGjwMbpb . RmgSmSwtRtShgSSWWQmW) (DffTZLLzFFFTC . RJMhWBzhmhgJt) (CVVZLLTTsZTFCnMffMTFHffL . VpGpNqGjNbNPljqVPcGNGlcv) (rvJfztqQJqqrqHHwCzCl . TbBhDBBDrbSgphbVTrrV) (FFGdNWFLGWMm . LDbpRwVbgRBp) (dmNGmZjM . jQwtHCCw) (MSGbqbqMbbGDhSSGDhL . NBPNcrDPPfzfczPfrnv) (rRwsrljslRgslwwgpssCj . RtBNvnmPmBmccvmPnmzcP) (CjVjsssJQpTCrCCg . HJLMSZbhMhWGZhHG) (JtBGBFGRVGVLLctRttthLFRB . DQlDppljJwNQlpHHQqDHbHHN) (szSZTrzdzTSMdzsms . qqQqwdbgDNqgQNjlN) (SzmrlWPrlfPMsMZTP . tCVCFRhhvhccLFPvL) (chmbsMDMMc . BnGbZBzZGL) (JjjgJrJJggNgtr . QSQBLjWBZlGnnB) (rFNrFtFCRNVrr . sHmMDcsLqMhMF) (DLMwrBGgrBBDrcBcNBg . WhpGhqVhhqSjqqqmjjp) (JfJCZCdtlbZl . HHbjWVpPmHWb) (lTtZtnFQCztWFzJflZ . LcsrLFNDRNBcswcLMM) (tsVttVCBsCcCqPqwvtqNP . QjWDDWjzQQWnpJQSrWJJN) (LMRdZvHGgMmZZGGLGLbhLh . JpjWrSjndWJpSJrJppJnpj) (RhRgLMlmgMGMFGLl . TtcBvwcfFCtVvfFT) (llBBmtncBglfq . wsdwsjdbHwQHm) (zGRhPJvFzhvFvMDGFvGP . wSWWQpdpHSwSjWjHsWMw) (JGFhDPrLTzhLhvFPzPjLjTzF . lBqltnCqqBffcTgfnZfCfCnB) (QWQGNHQBffCN . DMPdRTDLPVMN) (hrtlhtzZwJtwwgFgtlJthJJt . ZMqPVVpLmDVqRDmVPmMPVRTV) (SJSSnJwJlsFF . vcHSBbfLQHGL) (zMNVzhNFsdNssmh . lvtQvlttBlVGbTt) (wHpFwjHjLFH . lwtncTQlnwn) (CCpjpqLCLqJggg . hqRmFsNRFmPszh) (CTjmprmNcnmCN . VQbstnstvbnQv) (jqqdGhHgPRd . fRRQvfLQffz) (BGgqBhMdgqBHMDDqqMPwgdh . STJNjjmJWWCTCCmwTWZNpmZ) (LqSDFFmdq . DBDbbBHWl) (dQcRpgwRQP . ngBWHbVWht) (vdQMJQCQQvrJ . NqrTNsSZSmZT) (cqrHcHHFNFPLLNPHLWnHHFHF . jvlbZfWjSjBjZfSblhbBSbSf) (VdVTGwTzTwTpMJs . lvjfsbbZSvnBClj) (nJdGmmTpTTdm . NQNNLPPmDFQL) (VcjpTTtpcbThJBTTcjB . vSPJzJlvPlwfJrgrgvw) (dmshCNqnqdhmRsCsqCn . rNgPPrPfzrNLfSwSgzl) (ddQZdFnhs . MttFTbDDD) (hLThMTSdfMzzLzTL . sFTbwtDvtsFTnttF) (pZlNllPWrPCQPQlWNqjrqrj . snfDFbbtbstwswtvDnwtwjt) (pCNNQBCClQrplrfHQpQ . dSRMSVRhJzRchRhGHSh) (RZfVfRnTcPQWZcRVcR . NSvljQsSSjNvvNqvss) (pwbwgmqJh . GlNvvzgMM) (pthrhpmthmwhHHpLbbdrJm . LWWRPTRZnCnPCPBnWTWTZq) (nzsJJsMjGMMs . QFbnNmLnmCfb) (HlllPPTPlWTPDRRDRHcwwhr . LLZfQmgmmQCFHvNZCgfggZQ) (lPcNTwNWdd . GsMSttdjzj) (bTbJZJDVFdqpBZTFTZJprd . csjjGszmjQszcjzDvsgccv) (HHLnhMNCCPhfhCLMlPln . vgGfctscSvtSjGjztQtm) (wWNQMPPMwlPHHPnnRLw . WpJbrbbqbdppqJVJdZV) (gpgpNnnrhw . BVWFqgjqqF) (ZCTsdRbCGZpZzCSGb . WmtMBmWtqBBqdjjmq) (LcsTSlplZ . rJNcQQPvH) (DJDpMcqJDcDddNcJPGcJGF . fnfZZmZZfRQZRNmVQVnBNn) (WWThvSSHFshlSsHvgTHLl . zBQfVWwmwnnfmRQWnQVRn) (vljlgHjhstHbLhjLj . rbPqMGJcJFJCMPrdF) (pJlPMpMBrrMcnrBBMMr . vdhdgFvmcFdWtmdtftg) (bVVRmTRVTVVSVVVzZZqs . ggFHWTWtWffWFfWdtHdH) (RjLQDSzmVsjRRZSZQ . rCMJDPwlnJJnGGrPB) (GRgJtglPG . lCrhQQrfW) (vSjvZvZHNBjZSvwjvmvND . qhhFqhHrMhrHpfWqQfhpW) (NBmwDSbZbvsNNBjmZf . JzJgbVnGJbzVzPVRtL) (QQZVQCdlVmdZnWm . JBrLwSJRdggwdJr) (DqHhPhcpvDqPFjhHjtFPss . SJNfSBwBvffrgJwwJLBJbr) (jpsHcptHsqtPttsjctpFhG . lZwCMlWMmWGCWVQnTMVWmz) (zzvnHjHWSfnvzpnfSRHdg . rrsmWmhVrrwwbTrTmsrwm) (NlLNGqqclqlZZCLCGGCPll . JhhPJbrmpmrwVshFVsJbwr) (DMLDNCZQCGLQGDtQpGtM . jRdfdSRSSBtjtBjfjgjS) (WBBJfjBQJjf . tGCbttVJptC) (sdlmTHsqNsq . pRtGcbWdbnR) (svNMhmWHNmvmvHZWT . vBQDgSSjDFPSBSFPP) (mrlgqncgwHdqWWh . RNtRttSvbRwwSvN) (jZLCZVZzVcCTcpCDV . SBBSbvvRFbfDBSDNS) (VPJVpQjTZLjVLJJQGZTZGcQV . ghsGlmhshlqnghqrdrgldhlW) (qwGDMqMFWbFbqbDwMgqgn . jfnffffcTTjNnpTfBncZZ) (lSdclSltlzPsJl . hNNfTQPTmQhpPh) (LtllsscLLLvvJlSz . WGqwrDGqvbqMwMGb) (bnfvnnQsV . TdHQDmdNN) (fwlttwrfSf . LwdGZGmGND) (qlPrjjplfSpjSltftt . BBsvgzgbgnggBqWVvC) (HHrBSmBqB . HdHCFcQsc) (WqtMDDnMM . ZhMhcsQVM) (bqtbGDLLTTnRP . wvGgBNmNrwvjm) (RwWzWFwB . cdSdMgJW) (mrTjVQDQthQvjrvTm . ggFbbdgSJcJDFgSdg) (phhFtvjNvFvTTvmT . HZzlGlzZRZLBlzRp) (cHlZmZmJSHZcTVGmvZVcGVHl . NtbDNbtWFWdtlbCWbWtQDFdr) (pwfwgRhngPjj . tdWdNtFrdFwT) (RTgMpfhB . cMJGHqcz) (dmCbpCLQVFmCRddCTFLCg . ZtWPNBhSNNwZWgWZvSwhN) (rDzGDjJH . hhwzThBS) (rJrclsjjsJMJnJM . LnbQQQFmRTqLVRT) (TgFTGPtr . WHzgCJDz) (fQbfLwbbF . bWjHJHWjd) (LvQvwVfQvQhLLLLsmMBfLfBh . qchtGFSNSFNqrSqPcqSGttSN) (MsMmFgTVMMgMdFVMhd . zWqCCBCWjWqBWqhzzL) (nHfZDlbvcrDpcpcfD . JbNJqGLbCjBmjLzJC) (RnDZHwmm . TwVMTsMS) (NpdpdnjNCRjBnHRPpBDn . hSdSwFFLFdScFFWcFWLd) (stqMrMZtsQMJmMqvrtqMbstQ . VchPFWgFVVFVwfWJcSSWVSSV) (MQrZzbvMrrrZZtZmstMtMs . DRRjPHCGTjBnzpnDHTCGjG) (ClGGvDMGMNhNSm . FVPbpgFgmFgZPb) (WhTTLWsBBWTcr . PpggtQpsQFpVb) (fBRTqWLjTrz . DNhMvCSGDzl) (jbzjttVzpbWzWVbTtzWzV . wPbPPcwDDccccFNFLMFsm) (rlghJZHmCHvHJvR . LSNLhhhccNPwcMP) (QffmBZRB . GtVTBdTG) (bDRqHwwR . pNPnbppn) (FqrlQSQJSVsQr . SCmpdPNpcNCcP) (jFZjrssjBhrZVhJLL . GHfMHfwtqRjMqRTvD) (SMMCTBzFfSRhTThCSMRSzzH . nJgqGDHQgGVDnqrqnqqnqcQ) (ljvjpWPbrWWtrb . mDVDlmnDnqVmgJ) (bNjsNPrNPtsw . fZzfTSTBwhSM) (hNMNdssdMqdTQchqgN . ZzHtwmwGHHzmQZGHDH) (JrbJvJrvLrPjrPCVCjRBLPb . zfRFZmzwHgFHmGHmwFwzFZR) (rpbrvVjPCBbCJrCSLSP . sTlphNncMglcNTMWMql) (fGWGHbrllCCWWllF . NPQSZvdPSvdZTffZ) (tqssVjJMJ . WzWVvSvWS) (qtwMwDWjnRRwssWjngwjjn . hhDcCLhhCFHlcmcbCHFmDC) (rFTdFjdRDTTlD . WCqvhwLhwZdLS) (QzfJfnfsbsJHMnNmH . hVpCZwSQSWqSqVQhS) (nJnczsHzNMmBJnbnbNwnfzJf . cDTltllRTgPlFlgPrTDjPRGl) (ZLCGDvvJlvGCh . SPZWPSsZWdRRN) (rQccBwcccnHmQggn . VLPLWpgVWPpWzSRs) (fmwTfTHnMBTf . JDbfftJLvhlL))
+
+And then it is one wonderful line:
+
+#+begin_src elisp :exports both
+(let ((counter 0))(dolist (line input) (setq counter (+ counter (char-to-prio (find-duplicate (car line) (cdr line)))))) counter)
+#+end_src
+
+#+RESULTS:
+: 7446
+
+* Part 2
+
+Uff...
+Well, my assumptions sucked.
+Now I need to combine the lines again and also find multiple duplicates, which my solution from part 1 cannot do...
+
+Fortunately, I do not need to change much:
+
+#+begin_src elisp :exports both
+(defun find-duplicates (list1 list2) (let ((iterator (append list2 nil)) (duplicates ""))
+    (dolist (char iterator)
+      (message "Checking char: %s" char)
+      (if (string-search (char-to-string char) list1)(setq duplicates (concat (char-to-string char) duplicates))))
+    duplicates))
+
+(find-duplicates "ABCDEF" "AbcDeF")
+#+end_src
+
+#+RESULTS:
+: FDA
+
+For the rest of the solution, I define a new function (Why is there no solve-3-1?):
+
+#+begin_src elisp :exports both
+(defun solve-3-2 (data)
+(let ((elf-counter 0) (score 0) (badge-candidates ""))
+(dolist (line data)
+  (let ((rucksack (concat (car (elt data elf-counter) ) (cdr (elt data elf-counter)))) (group-counter (mod elf-counter 3))) ;;because we split them when loading the data
+    (message "is0: %s elf: %d  group: %d  rucksack: %s  badge: %s" (equal group-counter 0) elf-counter group-counter rucksack badge-candidates)
+    (cond
+      ((equal group-counter 0)(setq badge-candidates rucksack)) ;;reset group.
+      ((equal group-counter 1)(setq badge-candidates (find-duplicates rucksack badge-candidates))) ;;compare with first elf
+      ((equal group-counter 2)(progn (setq badge-candidates (find-duplicates rucksack badge-candidates))(setq score (+ score (char-to-prio (elt badge-candidates 0))))))) ;; compare with common stuff from first two elfs
+    (incf elf-counter)
+     ))
+score
+))
+
+(solve-3-2 dummy-input)
+#+end_src
+
+#+RESULTS:
+: 70
+
+This does the following:
+It iterates over all lines and depending on whether its the first, second or third elf of a group, does slightly different things.
+There are no sanity checks whatsoever: Are there even 3n lines? Probably, since its advent of code and the input is usually nicely behaved.
+Is there always exactly one "badge"? Also probably yes. YOLO! I am happy if I come up with any solutions in elisp, yet alone the correct ones.
+Generally applicable code is really not the goal here :D
+
+
+And trying to run it on the complete data:
+
+#+begin_src elisp :exports both
+(solve-3-2 input)
+#+end_src
+
+#+RESULTS:
+: 2646
+
+yields a result which is in fact correct!
+[[https://www.youtube.com/watch?v=UBX8MWYel3s][Nice!]]

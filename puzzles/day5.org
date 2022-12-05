@@ -1,0 +1,226 @@
+#+title: Day5
+#+PROPERTY: header-args :session Day5 :exports both
+
+* Part 1
+
+Ok, this sounds like a bit more work this time:
+The input parsing is much more tricky and I can only think of a brute-force
+method to solve the puzzle right now.
+There has to be a way to implement some shortcuts and don't do all instructions, but I just hope
+this will be fast enough.
+
+** Parsing
+This will be the "hard", so lets start one by one.
+
+*** Parse the start positions
+
+Thoughts:
+- The brackets will have to go
+- The character marking the crate is in the same column as the id of the stack
+- Missing values are just empty, no brackets at all -> No useful delimiter
+- Invert the thing? Like building from the bottom up? Hm...
+
+I think the most important thing is, that everything is alway just one character.
+So I can hardcode the positions.
+There is still an argument to be made about inverting:
+Go though the lines until you end up at the " 1 2 3 4 ..." line,
+build an alist from that and then reverse.
+
+Alternatively start from the top, build lists and construct the alist later.
+
+This:
+
+#+begin_src elisp
+(defun parse-stack-line (line)
+  (split-string line))
+(let ((x "    [D]    "))(parse-stack-line x))
+#+end_src
+
+#+RESULTS:
+| [D] |
+
+wont do it.
+
+This should work though and will not iterate over every single character, but instead go in chunks of 4 (3 irrelevant chars between stacks).
+It also replaces whitespaces with nil to make the construction easier later.
+
+#+begin_src elisp
+(defun parse-stack-line-2 (line)
+  (let ((char-list (string-to-list line))(counter 1) (result '())) ;; 1 because the first one is a whitespace or [
+    (while (< counter (length char-list))
+      (let ((val nil))
+        (if (not (equal (elt char-list counter) 32)) (setq val (elt char-list counter)))
+      (push val result))
+      (setq counter (+ counter 4))
+      )
+    (nreverse result))) ;; reverse because push adds to the front
+(let ((x "    [D]    ")(y "[N] [C]    ")(z " 1   2   3 "))(parse-stack-line-2 x))
+#+end_src
+
+#+RESULTS:
+| nil | 68 | nil |
+
+There is no special casing for the integers, but it should not be needed, they are only indexes.
+
+__Note__: In the full input, there are only 9 stacks. If there were then, we would be in trouble with that indexing!
+
+
+*** Parse the instruction
+
+Here the numerical values can exceed 9, so no fixed positions in the strings...
+One can trivially split on whitespaces and the use the elements (1,3,5) (-> 0 index!).
+There might be more efficient ways, but I think thats what I will implement:
+
+#+begin_src elisp :exports both
+(defun parse-instruction-line (line)
+  (let ((result '())(split '())(result '((from . nil)(to . nil)(n . nil))))
+    (setq split (split-string line))
+    (setf (alist-get 'from result) (elt split 3))
+    (setf (alist-get 'to result) (elt split 5))
+    (setf (alist-get 'n result) (elt split 1))
+    result))
+(let ((x "move 5 from 2 to 7"))(parse-instruction-line x))
+#+end_src
+
+#+RESULTS:
+: ((from . 2) (to . 7) (n . 5))
+
+That seems to work!
+Again: This is probably not super efficient, but its relatively understandable and readable, which is more important to me right now.
+
+*** Putting it together
+
+Now, that I can read any single line, I need to:
+
+A) collect the results from all the lines in some lists (Make sure order is correct!)
+
+B) "Change mode": Parse the starting config first, then the instructions. All in one function without hardcoded line numbers (Because I dont want to).
+
+
+#+begin_src elisp :exports both
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((instructions '())(stacks nil)(instruction-mode nil)(line "")(parsed-line nil)(from '())(to '())(n '())(final-stack '()))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (if instruction-mode
+            (progn
+              (setq parsed-line (parse-instruction-line line))
+              (push (alist-get 'from parsed-line) from)
+              (push (alist-get 'to parsed-line) to)
+              (push (alist-get 'n parsed-line) n)
+              )
+            (progn
+              (setq parsed-line (parse-stack-line-2 line))
+              (cond ((equal (elt parsed-line 0) 49) (progn (setq instruction-mode t) (forward-char) (move-end-of-line nil)))  ;; we found the line with the " 1   2   3 ..." (49 is the value of the char 1) skip it and the next eno, which is empty
+                    (t (if (not stacks)
+                           (setq stacks (cl-pairlis (number-sequence 1 (length parsed-line)) parsed-line)) ;; we kind of assume that no stack is empty at the beginning here...
+                           (loop for key in (mapcar 'car stacks) for new-crate in parsed-line collect
+                                 (setf (alist-get key stacks) (append (list(alist-get key stacks)) (list new-crate)))
+                           ))
+                       )
+                    )
+              )
+            )
+          (forward-char)))
+
+      ;; Super ugly, I really screwed the structure up
+    (loop for key in (mapcar 'car stacks) for value in (mapcar 'cdr stacks) collect
+          (setf (alist-get key final-stack) (remove nil (-flatten value))) ; this now has the top element first!
+          )
+    (setf (alist-get 'from instructions) (reverse from))
+    (setf (alist-get 'to instructions) (reverse to))
+    (setf (alist-get 'n instructions) (reverse n))
+      (list final-stack instructions)
+      )))
+(setq dummy-input (read-input "../data/day5/dummy-input"))
+#+end_src
+
+#+RESULTS:
+| (3 80)      | (2 68 67 77) | (1 78 90)      |
+| (n 1 3 2 1) | (to 1 3 1 2) | (from 2 1 2 1) |
+
+#+begin_src elisp
+(let ((x '("A" "B")) (y '()))
+     (push (pop x) y) (list y x))
+#+end_src
+
+#+RESULTS:
+| A |
+| B |
+
+#+begin_src elisp
+(setq dummy-input (read-input "../data/day5/dummy-input"))
+(defun solve-5-1 (data)
+  (let ((stack (elt data 0)) (instructions  (elt data 1)) (result '()))
+    (loop for n in (alist-get 'n instructions) for from in (alist-get 'from instructions) for to in (alist-get 'to instructions) collect
+    (let ((substack '()) (remaining (string-to-number n)))
+    (progn
+      (message "\nHere is the iter %s %s %s %s" n from to stack)
+      (message "Popping %s times from key %s" n from)
+      (dotimes (i (string-to-number n))
+      (push (pop (alist-get (string-to-number from) stack)) (alist-get (string-to-number to) stack))
+      )
+    )))
+    (dotimes (i 10) (if (not(equal(elt (alist-get i stack) 0) nil)) (push (elt (alist-get i stack) 0) result)))
+    (concat (reverse result))))
+
+(solve-5-1 dummy-input)
+#+end_src
+
+#+RESULTS:
+: CMZ
+
+
+#+begin_src elisp
+'(?C ?M ?Z)
+#+end_src
+
+#+RESULTS:
+| 67 | 77 | 90 |
+
+
+#+begin_src elisp
+(setq input (read-input "../data/day5/input"))
+(solve-5-1 input)
+#+end_src
+
+#+RESULTS:
+: WCZTHTMPS
+
+Finally...
+* Part 2
+
+#+begin_src elisp
+(setq dummy-input (read-input "../data/day5/dummy-input"))
+(defun solve-5-2 (data)
+  (message "\n Solving part 2; ")
+  (let ((stack (elt data 0)) (instructions  (elt data 1)) (result '()))
+    (loop for n in (alist-get 'n instructions) for from in (alist-get 'from instructions) for to in (alist-get 'to instructions) collect
+    (let ((substack '()) (remaining (string-to-number n)))
+    (progn
+      (message "\nHere is the iter %s %s %s %s" n from to stack)
+      (message "Popping %s times from key %s" n from)
+      (dotimes (i (string-to-number n))
+        (push (pop (alist-get (string-to-number from) stack)) substack))
+;;      (setq substack (reverse substack))
+      (dotimes (i (string-to-number n)) (push (pop substack) (alist-get (string-to-number to) stack))))))
+    (dotimes (i 10) (if (not(equal(elt (alist-get i stack) 0) nil)) (push (elt (alist-get i stack) 0) result)))
+    (concat (reverse result))))
+
+(solve-5-2 dummy-input)
+#+end_src
+
+#+RESULTS:
+: MCD
+
+#+begin_src elisp
+(setq input (read-input "../data/day5/input"))
+(solve-5-2 input)
+#+end_src
+
+#+RESULTS:
+: BLSGJSDTS

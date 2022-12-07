@@ -1,0 +1,183 @@
+#+title: Day7
+#+PROPERTY: header-args :session Day7 :exports both
+
+* Part 1
+Observations:
+- You start in root and dont jump there again -> Parser needs to be less general
+
+
+#+begin_src elisp
+(expand-file-name "stdl" "/sscj/hmz/zmvhp")
+#+end_src
+
+#+RESULTS:
+: /sscj/hmz/zmvhp/stdl
+
+#+begin_src elisp :exports both
+(defun parse-filesize (line current-dir)
+  (let ((line-split (split-string line)))
+    (cons (expand-file-name (elt line-split 1) current-dir) (elt line-split 0))
+    ))
+
+(parse-filesize "14848514 b.txt" "/test/abc")
+#+end_src
+
+#+RESULTS:
+: (/test/abc/b.txt . 14848514)
+
+
+#+begin_src elisp :exports both
+(defun parse-instruction (line)
+  (cond ((string-match "$ ls" line) '("ls" . "."))
+        ((string-match "\\(cd\\) \\([a-zA-Z./]+\\)" line) (cons (match-string 1 line) (match-string 2 line)))
+        ))
+
+(list (parse-instruction "$ ls") (parse-instruction "$ cd abcd") (expand-file-name (cdr (parse-instruction "$ cd ..")) "/test/abc") (parse-instruction "$ cd stdlstb"))
+#+end_src
+
+#+RESULTS:
+: ((ls . .) (cd . abcd) /test (cd . stdlstb))
+
+
+#+begin_src elisp
+(defun parse-input (filename)
+  (with-temp-buffer (insert-file-contents filename)
+  (let ((files '())(directories '())(current-dir "/")(line "")(counter 0))
+    (while (not (eobp))
+      (let ((beg (point)))
+        (move-end-of-line nil)
+        (setq line (buffer-substring beg (point)))
+        (message "%s: Current dir before parsing is: %s  after the %d th line" line current-dir counter)
+        (cond
+         ((equal (elt line 0) ?$)
+          (let ((instruction (parse-instruction line)))
+            (message "Found instruction: %s. Will move dir from %s to %s" instruction current-dir (cdr instruction))
+            (setq current-dir (expand-file-name (cdr instruction) current-dir)) (push current-dir directories)))
+         (t
+          (push (parse-filesize line current-dir) files))
+         )
+        (forward-char)
+        (incf counter)
+        (if (> counter 5000)(return 42))))
+    (cons (seq-uniq directories) files))))
+
+(setq dummy-input (parse-input "../data/day7/dummy-input"))
+dummy-input
+#+end_src
+
+#+RESULTS:
+: ((/d / /a /a/e) (/d/k . 7214296) (/d/d.ext . 5626152) (/d/d.log . 8033020) (/d/j . 4060174) (/a/e/i . 584) (/a/h.lst . 62596) (/a/g . 2557) (/a/f . 29116) (/a/e . dir) (/d . dir) (/c.dat . 8504156) (/b.txt . 14848514) (/a . dir))
+
+#+begin_src elisp
+(defun dirs-of-path (filepath)
+  (let ((paths (split-string filepath "/"))(result '("/"))(current "/"))
+    (setq paths (subseq paths 1)) ;;remove empty first one
+;;    (setq paths (push "root" paths)) ;; add root dir. why is "/" not working?
+;;    (setq path (butlast paths)) ;; remove filepath
+    (dolist (d (butlast paths))(setq current (expand-file-name d current))(push current result))
+    result
+    )
+  )
+(dirs-of-path "/test/a/b/c.txt")
+#+end_src
+
+#+RESULTS:
+| /test/a/b | /test/a | /test | / |
+
+
+#+begin_src elisp
+(expand-file-name ".." "/")
+#+end_src
+
+#+RESULTS:
+: /..
+
+#+begin_src elisp
+(let ((dir-sizes (pairlis (car dummy-input) (make-list (length (car dummy-input)) 0)))(files (cdr dummy-input)))
+(type-of (elt (mapcar 'car dir-sizes) 0))
+(mapcar 'car dir-sizes)
+(alist-get (elt (mapcar 'car dir-sizes) 2) dir-sizes)
+(alist-get "/a" dir-sizes nil nil #'equal)
+(add-to-list (cons (alist-get "C" dir-sizes) 42))
+dir-sizes
+)
+#+end_src
+
+#+RESULTS:
+: ((C . 42) (/d . 0) (/ . 0) (/a . 0) (/a/e . 0))
+
+
+#+begin_src elisp
+(dirs-of-path "/test/a/b/c/d")
+#+end_src
+
+#+RESULTS:
+| root | test | a | b | c |
+
+
+#+begin_src elisp
+(defun solve-7-1 (data)
+  (let ((dir-sizes '())(files (cdr data))(result 0))
+    (dolist (file files)
+      (let ((size (string-to-number (cdr file)))(parents (dirs-of-path (car file))))
+        (if (> size 0)
+        (dolist (parent parents)
+          (setf (alist-get parent dir-sizes nil nil #'equal) (+ (alist-get parent dir-sizes 0 nil #'equal) size)) ;; need to compare for equal because strings and symbols and magic and elisp...
+          ))
+        )
+      )
+    (setq dir-sizes (sort dir-sizes (lambda (a b) (> (cdr a) (cdr b)))))
+    dir-sizes
+    (let ((counter 0))
+      (dolist (element dir-sizes)
+;;        (if (>= counter 3) (return result)) ;; where did i find that?
+        (if (<= (cdr element) 100000) (progn (message "Adding to sum: %s" element)(setq result (+ result (cdr element)))(incf counter)))
+        ))
+    result
+       ))
+
+(solve-7-1 dummy-input)
+#+end_src
+
+#+RESULTS:
+: 95437
+
+#+begin_src elisp
+(setq input (parse-input "../data/day7/input"))
+(solve-7-1 input)
+#+end_src
+
+#+RESULTS:
+: 1232307
+
+** Part 2
+
+#+begin_src elisp
+(defun solve-7-2 (data)
+  (let ((dir-sizes '())(files (cdr data))(result 0)(needed 30000000)(total 70000000)(free 0))
+    (dolist (file files)
+      (let ((size (string-to-number (cdr file)))(parents (dirs-of-path (car file))))
+        (if (> size 0)
+        (dolist (parent parents)
+          (setf (alist-get parent dir-sizes nil nil #'equal) (+ (alist-get parent dir-sizes 0 nil #'equal) size)) ;; need to compare for equal because strings and symbols and magic and elisp...
+          ))
+        )
+      )
+    (setq dir-sizes (sort dir-sizes (lambda (a b) (> (cdr a) (cdr b)))))
+    (setq free (- total (cdr (elt dir-sizes 0))))
+    (setq needed (- needed free))
+    (message "We have %d of unused data" free)
+    (message "We need another %d of data" needed)
+    (dolist (folder dir-sizes)
+      (message "Checking folder %s" folder)
+      (if (< (cdr folder) needed) (cl-return result)) ;; means we need to return the previous one
+      (setq result (cdr folder))
+      )
+    result
+))
+
+(solve-7-2 dummy-input)
+#+end_src
+
+#+RESULTS:
+: 24933642

@@ -1,0 +1,253 @@
+#+title: Day8
+#+PROPERTY: header-args :session Day8 :exports both
+
+* Part 1
+Hm, 2D input...
+How could I handle that in elisp?
+
+Define some helpers:
+
+#+begin_src elisp
+(defun create-empty-grid (n m)
+(setq m-array (make-vector n nil))
+(dotimes (i n) (setf (aref m-array i) (make-vector m 0)))
+m-array)
+
+(defun create-bool-grid (n m)
+(setq m-array (make-vector n nil))
+(dotimes (i n)(setf (aref m-array i) (vconcat (make-bool-vector m nil))))
+m-array)
+
+(defun get-grid-size (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((list '())(n 0)(m 0))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (incf n)
+          (setq m (length line))
+          (forward-char)))
+      (cons n m))))
+
+(setq grid-size (get-grid-size "../data/day8/dummy-input"))
+#+end_src
+
+#+RESULTS:
+: (5 . 5)
+
+#+begin_src elisp
+(defun read-input (filename n m)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((list '())(grid (create-empty-grid n m))(i 0))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+            (dolist (k (number-sequence 0 (- (length line) 1)))
+              (setf (elt (elt grid i) k) (- (elt line k) ?0)) ;;ascii magic
+)
+          (incf i)
+          (forward-char)))
+      grid)))
+
+(setq dummy-matrix (create-bool-grid (car grid-size) (cdr grid-size)))
+(setq dummy-input (read-input "../data/day8/dummy-input" (car grid-size) (cdr grid-size)))
+#+end_src
+
+#+RESULTS:
+: [[3 0 3 7 3] [2 5 5 1 2] [6 5 3 3 2] [3 3 5 4 9] [3 5 3 9 0]]
+
+#+begin_src elisp
+dummy-matrix
+#+end_src
+
+#+RESULTS:
+: [[nil nil nil nil nil] [nil nil nil nil nil] [nil nil nil nil nil] [nil nil nil nil nil] [nil nil nil nil nil]]
+
+
+#+begin_src elisp
+(defun check-visibility (trees visibilities)
+  (let ((n-visible 0) (n (- (length trees) 1)) (m (- (length (elt trees 0)) 1))(counter 0))
+
+    ;; row-wise
+  (dolist (i (number-sequence 0 n))
+    (let ((highest -1))
+      (dolist (j (number-sequence 0 m))
+        (let ((height (elt (elt trees i) j )))
+          (if (or (> height highest) (equal j 0) (equal j m))
+              (progn
+                (setq highest height)
+                (setf (elt (elt visibilities i) j) t)
+                ))))))
+
+    ;; row-wise right-to-left
+  (dolist (i (number-sequence 0 n))
+    (let ((highest -1))
+      (dolist (j-inverse (number-sequence 0 m))
+        (let* ((j (- m j-inverse))(height (elt (elt trees i) j )))
+          (if (or (> height highest) (equal j 0) (equal j m))
+              (progn
+                (setq highest height)
+                (setf (elt (elt visibilities i) j) t)
+               ;; (message "%d" height)
+                ))))))
+
+  ;; column wise
+  (dolist (j (number-sequence 0 m))
+    (let ((highest -1))
+      (dolist (i (number-sequence 0 n))
+        (let ((height (elt (elt trees i) j )))
+          (if (or (> height highest) (equal i 0) (equal i m))
+              (progn
+                (setq highest height)
+                (setf (elt (elt visibilities i) j) t)
+                ))))))
+
+    ;; column wise bottom-to-top
+  (dolist (j (number-sequence 0 m))
+    (let ((highest -1))
+      (dolist (i-inverse (number-sequence 0 n))
+        (let* ((i (- n i-inverse))(height (elt (elt trees i) j )))
+          (if (or (> height highest) (equal i 0) (equal i m))
+              (progn
+                (setq highest height)
+                (setf (elt (elt visibilities i) j) t)
+                ))))))
+
+  ;; I always screwed something up when I did it in the loops before
+
+  (dolist (i (number-sequence 0 n))
+    (dolist (j (number-sequence 0 m))
+      (let ((tree-visible (elt (elt visibilities i) j)))
+      (if tree-visible (incf n-visible))
+      (incf counter)
+        )))
+
+  (message "%d" counter)
+  (cons visibilities n-visible)
+  ))
+
+(pp (check-visibility dummy-input dummy-matrix))
+#+end_src
+
+#+RESULTS:
+: ([[t t t t t]
+:   [t t t nil t]
+:   [t t nil t t]
+:   [t nil t nil t]
+:   [t t t t t]]
+:  . 21)
+
+
+#+begin_src elisp
+(defun solve-8-1 (filename)
+(let* (
+       (grid-size (get-grid-size filename))
+       (input (read-input filename (car grid-size) (cdr grid-size)))
+       (visibilities (create-bool-grid (car grid-size) (cdr grid-size))))
+  (check-visibility input visibilities)))
+
+(setq test-result (solve-8-1 "../data/day8/dummy-input"))
+(pp test-result)
+#+end_src
+
+#+RESULTS:
+: ([[t t t t t]
+:   [t t t nil t]
+:   [t t nil t t]
+:   [t nil t nil t]
+:   [t t t t t]]
+:  . 21)
+
+#+begin_src elisp
+(cdr (solve-8-1 "../data/day8/input"))
+#+end_src
+
+#+RESULTS:
+: 1684
+
+I get the feeling this could have been solved recursively going from the outside to the inside...
+* Part 2
+
+#+begin_src elisp
+(elt (elt dummy-input 1) 2)
+#+end_src
+
+#+RESULTS:
+: 5
+
+#+begin_src elisp
+(defun look-left (grid i j)
+  (let ((selected (elt (elt grid i ) j))(score 0)(index (- j 1))(n (- (length grid) 1)) (m (- (length (elt grid 0)) 1)))
+    (while (>= index 0)
+      (incf score)
+      (if (<= selected (elt (elt grid i) index))(setq index -1))
+      (decf index))
+    score))
+
+(defun look-right (grid i j)
+  (let ((selected (elt (elt grid i ) j))(score 0)(index (+ j 1))(n (- (length grid) 1)) (m (- (length (elt grid 0)) 1)))
+    (while (<= index m)
+      (incf score)
+      (if (<= selected (elt (elt grid i) index))(setq index (+ m 1)))
+      (incf index))
+    score))
+
+(defun look-down (grid i j)
+  (let ((selected (elt (elt grid i ) j))(score 0)(index (+ i 1))(n (- (length grid) 1)) (m (- (length (elt grid 0)) 1)))
+    (while (<= index m)
+      (incf score)
+      (if (<= selected (elt (elt grid index) j))(setq index (+ n 1)))
+      (incf index))
+    score))
+
+(defun look-up (grid i j)
+  (let ((selected (elt (elt grid i ) j))(score 0)(index (- i 1))(n (- (length grid) 1)) (m (- (length (elt grid 0)) 1)))
+    (while (>= index 0)
+      (incf score)
+      (if (<= selected (elt (elt grid index) j))(setq index -1))
+      (decf index))
+    score))
+
+
+(let ((n 3)(m 2))
+(list (look-up dummy-input n m) (look-left dummy-input n m) (look-right dummy-input n m) (look-down dummy-input n m))
+)
+#+end_src
+
+#+RESULTS:
+| 2 | 2 | 2 | 1 |
+
+#+begin_src elisp
+(defun solve-8-2 (filename)
+  (let* (
+        (grid-size (get-grid-size filename))
+        (input (read-input filename (car grid-size) (cdr grid-size)))
+        (highest-score 0))
+    (dolist (i (number-sequence 0 (- (car grid-size) 1)))
+      (dolist (j (number-sequence 0 (- (cdr grid-size) 1)))
+        (let ((score 1))
+          (setq score (* score (look-left input i j)))
+          (setq score (* score (look-right input i j)))
+          (setq score (* score (look-up input i j)))
+          (setq score (* score (look-down input i j)))
+          (if (> score highest-score)(setq highest-score score))
+          )))
+    highest-score
+    ))
+
+(solve-8-2 "../data/day8/dummy-input")
+#+end_src
+
+#+RESULTS:
+: 8
+
+#+begin_src elisp
+(solve-8-2 "../data/day8/input")
+#+end_src
+
+#+RESULTS:
+: 486540

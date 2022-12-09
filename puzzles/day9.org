@@ -16,6 +16,15 @@ the tail.
 The positions of head and tail are saved in (x . y) structs.
 
 I think the signum is pretty sweet here!
+(Note that (signum 0) is 0)
+
+#+begin_src elisp :exports both
+(signum 0)
+#+end_src
+
+#+RESULTS:
+: 0
+
 
 #+begin_src elisp :exports both
 (defun calc-dist (x1 y1 x2 y2)

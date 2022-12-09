@@ -1,0 +1,210 @@
+#+title: Day9
+#+PROPERTY: header-args :session Day8 :exports both
+
+* Part 1
+- Start position can be anything, so let's do (0, 0)
+
+We need a smaller helper function to calculate the distance between head and tail.
+
+**Actually** it is not strictly needed and I work with x-distance and y-distance anyway, but
+at that point I thought it would be useful
+
+Then we can implement a function, that determines where the tail should move.
+I start here, because moving the head should be trivial, the difficult part really is only
+the tail.
+
+The positions of head and tail are saved in (x . y) structs.
+
+I think the signum is pretty sweet here!
+
+#+begin_src elisp :exports both
+(defun calc-dist (x1 y1 x2 y2)
+  (sqrt (+
+         (* (- x1 x2) (- x1 x2))
+         (* (- y1 y2) (- y1 y2))
+         )))
+
+(defun move-tail (head-position tail-position)
+  "Calculate and return the new tail position given the position of the head and the old tail position"
+  (let* (
+        (x-head (car head-position))
+        (y-head (cdr head-position))
+        (x-tail (car tail-position))
+        (y-tail (cdr tail-position))
+        (distance (calc-dist x-head y-head x-tail y-tail))
+        (x-movement 0)
+        (y-movement 0)
+        (x-distance (- x-head x-tail))
+        (y-distance (- y-head y-tail))
+        )
+    ;; 1.5 because thats above (sqrt 2) and below 2. Yes, that is somewhat janky
+    (if (> distance 1.5)(progn
+                          (setq x-movement (signum x-distance))
+                          (setq y-movement (signum y-distance))))
+    (cons (+ x-movement (car tail-position)) (+ y-movement (cdr tail-position)))
+  ))
+
+(move-tail (cons -3 0) (cons 3 0))
+#+end_src
+
+#+RESULTS:
+: (2 . 0)
+
+Now, the ground work is done and I can finally start working on parsing the input.
+Usually I do that first, but this time it seemed so easy, that I wanted to focus on the movement first.
+Maybe I should do that more often. It was useful first writing the functions and then making sure
+the variables have the correct shapes and datatypes.
+
+#+begin_src elisp :exports both
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((line "")(instructions '())(split ""))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (setq split (split-string line))
+          (push (cons (car split) (string-to-number (car (cdr split)))) instructions)
+            )
+          (forward-char))
+      (nreverse instructions))))
+
+
+(setq dummy-input (read-input "../data/day9/dummy-input"))
+(setq input (read-input "../data/day9/input"))
+(length input) ;; avoid output in buffer like None in pyplot. There should be better solutions, probably a babel header argument
+#+end_src
+
+#+RESULTS:
+: 2000
+
+Now the input is a list of (direction . n-steps) cons, where direction is a string and n an integer.
+
+#+begin_src elisp :exports both
+(list (elt dummy-input 0) (cdr (elt dummy-input 0)) (type-of (cdr (elt dummy-input 0))))
+#+end_src
+
+#+RESULTS:
+: ((R . 4) 4 integer)
+
+
+Solving the puzzle is now straight-forward:
+- Loop over instructions:
+  + check direction
+  + Move head n times and move tail accordingly after **each of the steps**
+  + Add tail position to visited fields
+- Remove duplicates
+- Calculate number of visited fields
+
+
+#+begin_src elisp :exports both
+(defun solve-9-1 (data)
+  (let (
+        (head-position (cons 0 0))
+        (tail-position (cons 0 0))
+        (visited '()))
+    (push tail-position visited)
+  (dolist (ins data)
+    (let ((direction (car ins))(n (cdr ins)))
+      (dolist (i (number-sequence 0 (- n 1)))
+        (cond
+         ((equal direction "R")(incf (car head-position)))
+         ((equal direction "L")(decf (car head-position)))
+         ((equal direction "U")(incf (cdr head-position)))
+         ((equal direction "D")(decf (cdr head-position))))
+        (setq tail-position (move-tail head-position tail-position))
+        (push tail-position visited)
+        (message "! %s %d %d \n New positions are %s %s" direction n i head-position tail-position)
+        )))
+  (length (delete-dups visited))
+  ))
+
+(solve-9-1 dummy-input)
+#+end_src
+
+#+RESULTS:
+: 13
+
+Thats the correct result, so let's try the complete data:
+
+#+begin_src elisp :exports both
+(solve-9-1 input)
+#+end_src
+
+#+RESULTS:
+: 6354
+
+* Part 2
+
+Rope is now multiple elements long.
+That should be relatively easy, if I understand the implications correctly:
+Each tail should just act as the head of the previous part, right?
+
+The code becomes a bit simpler by putting head and tails in one list of positions
+and then just starting from index 1.
+And then its the same for each iteration: The tail of the previous one becomes the head of the
+next one.
+
+I had a bit of trouble with scopes here, so I set the intermediate variable new-tail.
+
+#+begin_src elisp :exports both
+(defun solve-9-2 (data)
+  (let* (
+        (positions (list (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0)))
+        (visited '())
+        (l (- (length positions) 1))
+        )
+    (push (elt positions l) visited)
+  (dolist (ins data)
+    (let ((direction (car ins))(n (cdr ins))(head-position (elt positions 0)))
+      (dolist (i (number-sequence 0 (- n 1)))
+        (cond
+         ((equal direction "R")(incf (car head-position)))
+         ((equal direction "L")(decf (car head-position)))
+         ((equal direction "U")(incf (cdr head-position)))
+         ((equal direction "D")(decf (cdr head-position))))
+
+        (dolist (j (number-sequence 1 l))
+          (let* (
+                 (head-index (- j 1))
+                 (tail-index j)
+                 (current-head (elt positions head-index))
+                 (current-tail (elt positions tail-index))
+                 (new-tail nil)
+                 )
+            (setq new-tail (move-tail current-head current-tail))
+            (setf (elt positions tail-index) new-tail)
+            )
+          )
+        (push (elt positions l) visited)
+        )))
+  (length (delete-dups visited))
+  ))
+
+(solve-9-2 dummy-input)
+#+end_src
+
+#+RESULTS:
+: 1
+
+Let's just throw the second dummy data in, because we have no idea if that is correct.
+1 just could be no movememt at all.
+Which I had for a while (scoping...), but after I fixed that with some prints, the second test case works as well:
+
+#+begin_src elisp :exports both
+(setq dummy-input-2 (read-input "../data/day9/dummy-input-2"))
+(solve-9-2 dummy-input-2)
+#+end_src
+
+#+RESULTS:
+: 36
+
+With the real data:
+
+#+begin_src elisp :exports both
+(solve-9-2 input)
+#+end_src
+
+#+RESULTS:
+: 2651

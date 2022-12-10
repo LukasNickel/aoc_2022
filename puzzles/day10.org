@@ -1,0 +1,142 @@
+#+title: Day10
+#+PROPERTY: header-args :session Day10 :exports both
+
+* Part 1
+#+begin_src elisp
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((list '())(line "")(split nil))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (if (equal line "noop")
+              (push (cons line nil) list)
+            (progn
+            (setq split (split-string line))
+            (push (cons (car split) (string-to-number (car (cdr split)))) list)))
+          (forward-char)))
+      (nreverse list))))
+
+(setq dummy-input (read-input "../data/day10/dummy-input"))
+(length dummy-input)
+#+end_src
+
+#+RESULTS:
+: 146
+
+The text indicates, that the two cycles might need to be done one after the other.
+Thinking about it, it is in fact needed: You need to check after every single cycle if you hit 20/60/...
+
+The during part is a bit tricky as itmeans you cannot do the cycle check after the instruction is done, you need to do it before increasing X.
+
+I use a modulo 40, so I assume there wont be 260th cycle, but to make sure I return that as well:
+
+
+#+begin_src elisp
+(defun solve-10-1 (data)
+  (let ((cycle 0)(X 1)(result 0)(n-first 20)(n-iter 40))
+    (dolist (instruction data)
+      (cond
+       ((equal "noop" (car instruction))(incf cycle)(if (equal n-first (mod cycle n-iter))(setq result (+ result (* cycle X)))))
+       ((equal "addx" (car instruction))(progn
+                                          (incf cycle)
+                                          (if (equal n-first (mod cycle n-iter))(setq result (+ result (* cycle X))))
+                                          (incf cycle)
+                                          (if (equal n-first (mod cycle n-iter))(setq result (+ result (* cycle X))))
+                                          (setq X (+ X (cdr instruction))))))
+      )
+  (cons cycle result)
+  ))
+
+(solve-10-1 dummy-input)
+#+end_src
+
+#+RESULTS:
+: (240 . 13140)
+
+Why is the input so small? It probably does not even contain 220 cycles?
+
+#+begin_src elisp
+(setq input (read-input "../data/day10/input"))
+(length input)
+#+end_src
+
+#+RESULTS:
+: 147
+
+#+begin_src elisp
+(solve-10-1 input)
+#+end_src
+
+#+RESULTS:
+: (240 . 12460)
+
+Same amount of cycles, ok
+
+* Part 2
+
+Oh fuck, I need to render an "image"?
+I hope this works out to be just good enough with pretty print...
+
+At least it should be possible to reuse stuff form the first solution.
+There might be some smart ways to do this with less variables, but to keep track of what I am doing here.
+
+This sounds like a comparabely tricky part2 compared to the previous ones.
+
+The drawing needs to happen before the incrementation of the cycle to match the indices. Alternatively subtract 1.
+
+#+begin_src elisp
+(defun set-pixel (X Y)
+  "X being the sprite center, Y the pixel being drawn. Although its interchangeable."
+  (message "X: %d CRT: %d" X Y)
+  (cond
+;;   ((not (equal (/ X width)(/ Y width))) "#") ;; There might be a smarter way than 2 divisions
+   ((<= (abs (- X Y)) 1) "#")
+   (t ".")
+   )
+  )
+
+(defun solve-10-2 (data)
+   (let ((cycle 0)(X 1)(result 0)(n-first 20)(n-iter 40)(image (make-vector 6 nil)))
+     ;; fill the image with '#'
+     (dotimes (i (length image))(setf (aref image i)(make-vector n-iter ".")))
+    (dolist (instruction data)
+      (cond
+       ((equal "noop" (car instruction))
+        (setf (elt (elt image (/ cycle n-iter)) (mod cycle n-iter)) (set-pixel X (mod cycle n-iter)))
+        (incf cycle)
+        (if (equal n-first (mod cycle n-iter))(setq result (+ result (* cycle X)))))
+       ((equal "addx" (car instruction))(progn
+                                          (setf (elt (elt image (/ cycle n-iter)) (mod cycle n-iter)) (set-pixel X (mod cycle n-iter)))
+                                          (incf cycle)
+                                          (if (equal n-first (mod cycle n-iter))(setq result (+ result (* cycle X))))
+                                          (setf (elt (elt image (/ cycle n-iter)) (mod cycle n-iter)) (set-pixel X (mod cycle n-iter)))
+                                          (incf cycle)
+                                          (if (equal n-first (mod cycle n-iter))(setq result (+ result (* cycle X))))
+                                          (setq X (+ X (cdr instruction))))))
+      )
+  (cons cycle result)
+  image
+  ))
+
+(pp (solve-10-2 dummy-input))
+#+end_src
+
+#+RESULTS:
+: [["#" "#" "." "." "#" "#" "." "." "#" "#" "." "." "#" "#" "." "." "#" "#" "." "." "#" "#" "." "." "#" "#" "." "." "#" "#" "." "." "#" "#" "." "." "#" "#" "." "."]
+:  ["#" "#" "#" "." "." "." "#" "#" "#" "." "." "." "#" "#" "#" "." "." "." "#" "#" "#" "." "." "." "#" "#" "#" "." "." "." "#" "#" "#" "." "." "." "#" "#" "#" "."]
+:  ["#" "#" "#" "#" "." "." "." "." "#" "#" "#" "#" "." "." "." "." "#" "#" "#" "#" "." "." "." "." "#" "#" "#" "#" "." "." "." "." "#" "#" "#" "#" "." "." "." "."]
+:  ["#" "#" "#" "#" "#" "." "." "." "." "." "#" "#" "#" "#" "#" "." "." "." "." "." "#" "#" "#" "#" "#" "." "." "." "." "." "#" "#" "#" "#" "#" "." "." "." "." "."]
+:  ["#" "#" "#" "#" "#" "#" "." "." "." "." "." "." "#" "#" "#" "#" "#" "#" "." "." "." "." "." "." "#" "#" "#" "#" "#" "#" "." "." "." "." "." "." "#" "#" "#" "#"]
+:  ["#" "#" "#" "#" "#" "#" "#" "." "." "." "." "." "." "." "#" "#" "#" "#" "#" "#" "#" "." "." "." "." "." "." "." "#" "#" "#" "#" "#" "#" "#" "." "." "." "." "."]]
+
+
+#+begin_src elisp
+(pp (solve-10-2 input))
+#+end_src
+#+end_src
+
+#+RESULTS:
+: #

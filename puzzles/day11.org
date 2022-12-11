@@ -1,0 +1,257 @@
+#+title: Day11
+#+PROPERTY: header-args :session Day10 :exports both
+
+* Part 1
+
+Thats a complicated input and I dont have classes, so I use the next best thing:
+alists (read: dictionaries).
+
+Some observations about the input:
+- starting items is just some list
+- The "new: do something with old" block might be tricky. It looks like you could just throw it into eval if you were using python...
+- It also is always " new = old [+ or *] [number or old]" though, so not that many options and you can actually hardcode it
+- The test is always whether the input is divisible by some number, so we only need the number
+- What follows is always a true/false block with true first
+- Monkeys are sorted
+
+So my plan is to have functions to parse all of these and then continue with the actual puzzle:
+
+#+begin_src elisp :exports both
+(defun parse-start-items (line)
+  (let ((number-string (cdr (split-string line ":")))(result '()))
+    (dolist (n (split-string (car number-string) ","))
+      (push (string-to-number n) result)
+    )
+    (reverse result))
+  )
+
+(elt (parse-start-items "  Starting items: 54, 65, 75, 74") 0)
+#+end_src
+
+#+RESULTS:
+: 54
+
+#+begin_src elisp :exports both
+(defun parse-operation (line)
+  (let ((split (split-string line)))
+    (cons (elt split 4) (elt split 5)) ;;not a number yet
+    ))
+
+(parse-operation "  Operation: new = old + 4")
+#+end_src
+
+#+RESULTS:
+: (+ . 4)
+
+#+begin_src elisp :exports both
+(defun parse-test (line)
+  (string-to-number (elt (split-string line) 3))
+)
+(parse-test "  Test: divisible by 19")
+#+end_src
+
+#+RESULTS:
+: 19
+
+#+begin_src elisp :exports both
+(defun parse-throw (line)
+  "Actually almost the same as parse-test, but it helps to have two functions"
+  (string-to-number (elt (split-string line) 5))
+  )
+(parse-throw "    If true: throw to monkey 5")
+#+end_src
+
+#+RESULTS:
+: 5
+
+The input rarely changes for part 2, so I am taking the risk.
+
+#+begin_src elisp :exports both
+(defun make-monkey ()
+  '(("N" . nil)("Items" . ())("OP" nil)("DIV" . nil)("TRUE" . nil)("FALSE" . nil))
+  )
+(setq test (make-monkey))
+(add-to-list 'test ( cons "Items" '(1 2 3)))
+(assoc "Items" test)
+#+end_src
+
+#+RESULTS:
+| Items | 1 | 2 | 3 |
+
+#+begin_src elisp :exports both
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((monkeys '())(line "")(monkey (make-monkey)))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (cond
+          ((string-match-p "^Monkey" line)
+              (progn
+                (setq monkey (make-monkey))
+                (add-to-list 'monkey (cons "N" (string-to-number (elt (split-string line) 1))))
+                ))
+          ((string-match-p "^  Starting" line)(add-to-list 'monkey (cons "Items" (parse-start-items line))))
+          ((string-match-p "^  Operation" line)(add-to-list 'monkey (cons "OP" (parse-operation line))))
+          ((string-match-p "^  Test" line)(add-to-list 'monkey (cons "DIV" (parse-test line))))
+          ((string-match-p "^    If true" line)(add-to-list 'monkey (cons "TRUE" (parse-throw line))))
+          ((string-match-p "^    If false" line)(progn
+                                                   (add-to-list 'monkey (cons "FALSE" (parse-throw line)))
+                                                   (push monkey monkeys)
+                                                   ))
+          )
+          (forward-char)))
+      (nreverse monkeys))))
+
+(setq dummy-input (read-input "../data/day11/dummy-input"))
+#+end_src
+
+#+RESULTS:
+| (FALSE . 3) | (TRUE . 2) | (DIV . 23) | (OP * . 19)  | (Items 79 98)       | (N . 0) | (N) | (Items) | (OP nil) | (DIV) | (TRUE) | (FALSE) | (SCORE . 0) |
+| (FALSE . 0) | (TRUE . 2) | (DIV . 19) | (OP + . 6)   | (Items 54 65 75 74) | (N . 1) | (N) | (Items) | (OP nil) | (DIV) | (TRUE) | (FALSE) | (SCORE . 0) |
+| (FALSE . 3) | (TRUE . 1) | (DIV . 13) | (OP * . old) | (Items 79 60 97)    | (N . 2) | (N) | (Items) | (OP nil) | (DIV) | (TRUE) | (FALSE) | (SCORE . 0) |
+| (FALSE . 1) | (TRUE . 0) | (DIV . 17) | (OP + . 3)   | (Items 74)          | (N . 3) | (N) | (Items) | (OP nil) | (DIV) | (TRUE) | (FALSE) | (SCORE . 0) |
+
+
+Now for the actual puzzle.
+We need:
+- A loop over multiple rounds
+- Inside that: A loop over the monkeys
+- Inside that: A loop over a monkeys items with a counter that increments
+- A worry level
+- Throwing an item appends it to the other monkey list (At the end!) It is not the item value though! It ist the worry level!
+-
+
+#+begin_src elisp :exports both
+(defun solve-11-1 (data)
+  (let ((scores (make-vector (length data) 0)))
+    (dolist (i (number-sequence 0 19))
+      (dolist (j (number-sequence 0 (- (length data) 1))) ;; does this work or do I need indices?
+        (let* (
+              (monkey (elt data j))
+              (items (cdr (assoc "Items" monkey)))
+              (op (cdr (assoc "OP" monkey)))
+              (worry 0)
+              (test (cdr (assoc "DIV" monkey)))
+              (monkey-a (cdr (assoc "TRUE" monkey)))
+              (to-monkey-a '())
+              (monkey-b (cdr (assoc "FALSE" monkey)))
+              (to-monkey-b '())
+              )
+          (dolist (item items)
+            ; Count
+            (incf (elt scores j))
+            ; worry
+            (cond
+             ((equal "+" (car op))(setq worry (+ item (string-to-number (cdr op)))))
+             ((equal "*" (car op))(if (equal "old" (cdr op))(setq worry (* item item))(setq worry (* item (string-to-number (cdr op))))))
+                )
+            (setq worry (/ worry 3))
+            ; put to correct stack
+            (if (equal  0 (mod worry test))
+                (push worry to-monkey-a)
+                (push worry to-monkey-b))
+            )
+            ; Throw to one of the other monkeys
+            (if to-monkey-a
+                (setcdr (assoc "Items" (elt data monkey-a)) (append (cdr (assoc "Items" (elt data monkey-a))) (reverse to-monkey-a))))
+            (if to-monkey-b
+                (setcdr (assoc "Items" (elt data monkey-b)) (append (cdr (assoc "Items" (elt data monkey-b))) (reverse to-monkey-b))))
+            ; Now he has no more items
+            (setcdr (assoc "Items" monkey) '())
+          )
+        )
+      )
+    (setq scores (sort scores #'>))
+    (cons scores (* (elt scores 0) (elt scores 1)))
+    )) ; put results here
+
+(setq dummy-input (read-input "../data/day11/dummy-input"))
+(solve-11-1 dummy-input)
+#+end_src
+
+#+RESULTS:
+: ([105 101 95 7] . 10605)
+
+#+begin_src elisp :exports both
+(setq input (read-input "../data/day11/input"))
+(solve-11-1 input)
+#+end_src
+
+#+RESULTS:
+: ([347 345 338 332 321 23 17 15] . 119715)
+
+
+* Part 2
+
+I really had trouble parsing the text in terms of what was asked.
+
+Thanks, Max! I did not even get, that the result should not change.
+
+The only change is actually, that you no longer divde by 3, but instead take the modulo of
+the product of all divisors.
+
+#+begin_src elisp :exports both
+(defun solve-11-2 (data)
+  (let ((scores (make-vector (length data) 0))(divisor 1))
+    (dolist (monkey data)(setq divisor (* divisor (cdr (assoc "DIV" monkey)))))
+    (dolist (i (number-sequence 0 9999))
+      (dolist (j (number-sequence 0 (- (length data) 1))) ;; does this work or do I need indices?
+        (let* (
+              (monkey (elt data j))
+              (items (cdr (assoc "Items" monkey)))
+              (op (cdr (assoc "OP" monkey)))
+              (worry 0)
+              (test (cdr (assoc "DIV" monkey)))
+              (monkey-a (cdr (assoc "TRUE" monkey)))
+              (to-monkey-a '())
+              (monkey-b (cdr (assoc "FALSE" monkey)))
+              (to-monkey-b '())
+              )
+          (dolist (item items)
+            ; Count
+            (incf (elt scores j))
+            ; worry
+            (cond
+             ((equal "+" (car op))(setq worry (+ item (string-to-number (cdr op)))))
+             ((equal "*" (car op))(if (equal "old" (cdr op))(setq worry (* item item))(setq worry (* item (string-to-number (cdr op))))))
+                )
+
+            (setq worry (mod worry divisor))
+            ; put to correct stack
+            (if (equal  0 (mod worry test))
+                (push worry to-monkey-a)
+                (push worry to-monkey-b))
+            )
+            ; Throw to one of the other monkeys
+            (if to-monkey-a
+                (setcdr (assoc "Items" (elt data monkey-a)) (append (cdr (assoc "Items" (elt data monkey-a))) (reverse to-monkey-a))))
+            (if to-monkey-b
+                (setcdr (assoc "Items" (elt data monkey-b)) (append (cdr (assoc "Items" (elt data monkey-b))) (reverse to-monkey-b))))
+            ; Now he has no more items
+            (setcdr (assoc "Items" monkey) '())
+          )
+        )
+      )
+    (setq scores (sort scores #'>))
+    (cons scores (* (elt scores 0) (elt scores 1)))
+    )) ; put results here
+
+(setq dummy-input (read-input "../data/day11/dummy-input"))
+(solve-11-2 dummy-input)
+#+end_src
+
+#+RESULTS:
+: ([52166 52013 47830 1938] . 2713310158)
+
+And the solution for the complete dataset:
+
+#+begin_src elisp :exports both
+(setq input (read-input "../data/day11/input"))
+(solve-11-2 input)
+#+end_src
+
+#+RESULTS:
+: ([134482 134479 134273 117859 107875 80107 27438 26933] . 18085004878)

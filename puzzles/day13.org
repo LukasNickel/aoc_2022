@@ -1,0 +1,234 @@
+#+title: Day13
+#+PROPERTY: header-args :session Day13 :exports both
+
+* Part 1
+Python users have an advantage (again), but with some replacements and a helper function, the
+input can also be put into elisp eval.
+
+Just replace
+#+begin_quote
+"," -> " "
+"[" -> "("
+"]" -> ")"
+#+end_quote
+
+The brackets are important, because otherwise we get vectors instead of lists.
+
+Then I need a small helper function, that I took from stackoverflow, because eval
+actually does not take a string (????).
+
+#+begin_src elisp
+(defun my-eval-string (string)
+  "Helper from https://emacs.stackexchange.com/questions/19877/how-to-evaluate-elisp-code-contained-in-a-string"
+  (let ((result nil)) ; dont really need the let, I just used it for debugging
+  (setq result (eval (car (read-from-string (format "(progn %s)" string)))))
+  result
+  ))
+#+end_src
+
+#+RESULTS:
+: my-eval-string
+
+Then we can parse the input:
+
+#+begin_src elisp :exports both
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((result '())(line "")(current-pair '())(evaled-line nil))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+          (if (equal (length line) 0)
+              (progn (push (reverse current-pair) result)(setq current-pair '()))
+            (progn
+              (setq line (replace-regexp-in-string (regexp-quote ",") " " line))
+              (setq line (replace-regexp-in-string (regexp-quote "[") "(" line))
+              (setq line (replace-regexp-in-string (regexp-quote "]") ")" line))
+              (setq evaled-line (my-eval-string (concat "'" line)))
+              (push evaled-line current-pair)
+          ))
+          (forward-char)))
+      (push (reverse current-pair) result) ; I forgot this in Part a
+      (nreverse result))))
+
+(read-input "../data/day13/dummy-input")
+#+end_src
+
+#+RESULTS:
+| (1 1 3 1 1)                 | (1 1 5 1 1)                 |
+| ((1) (2 3 4))               | ((1) 4)                     |
+| (9)                         | ((8 7 6))                   |
+| ((4 4) 4 4)                 | ((4 4) 4 4 4)               |
+| (7 7 7 7)                   | (7 7 7)                     |
+| nil                         | (3)                         |
+| ((nil))                     | (nil)                       |
+| (1 (2 (3 (4 (5 6 7)))) 8 9) | (1 (2 (3 (4 (5 6 0)))) 8 9) |
+
+I actually made a mistake there first:
+Because I append when I find a newline, the last element was missing.
+It is not in the right order, so it did not matter, but for the second part it does.
+
+Then we need to be able to compare two elements to check if the order is correct.
+I actually implemented this recursively although I usually try to avoid it.
+It just seemed way easier.
+There are quite a few cases to handle. In numpy I would have used something like
+in [[numpy-atleast-1d]].
+
+Here, I do it all by hand and go down recursively until comparing integers.
+There are three cases:
+- ~t~: Left is smaller
+- ~nil~: Left is larger
+- ~"equal"~ Both are equal
+The third case is important for the recursion:
+If ~"equal"~, the function needs to continue with the next element, whereas in the other
+cases, it returns the value.
+
+#+name: numpy-atleast-1d
+#+begin_src python
+np.atleast_1d(element)
+#+end_src
+
+#+begin_src elisp :exports both
+(defun is-left-smaller (left right)
+  (catch 'early-finish
+    (if (and (equal left nil)(not (equal right nil))) (throw 'early-finish t))
+    (dolist (i (number-sequence 0 (- (max (length left) (length right)) 1)))
+      ;; check one exhausted
+      ;; this also handles nils as their length is 0, so they act like an empty list
+      (cond
+       ((<= (length left) i) (throw 'early-finish t))
+       ((<= (length right) i) (throw 'early-finish nil))
+       )
+      (let ((a (elt left i))(b (elt right i)))
+      ;; comparison of valid values
+      (cond
+      ((and (integerp a)(integerp b))(if (equal a b) nil (throw 'early-finish (< a b)))) ;both integers
+      ((and (listp a)(listp b))
+       (let ((recursive "equal"))
+         (setq recursive (is-left-smaller a b))
+         (if (not (equal recursive "equal"))(throw 'early-finish recursive))
+         )); both are lists
+      ((and (integerp a)(listp b))
+       (let ((recursive "equal"))
+         (setq recursive (is-left-smaller (list a) b))
+         (if (not (equal recursive "equal"))(throw 'early-finish recursive))
+         )); integer and lists
+      ((and (listp a)(integerp b))
+       (let ((recursive "equal"))
+         (setq recursive (is-left-smaller a (list b)))
+         (if (not (equal recursive "equal"))(throw 'early-finish recursive))
+         )); list and integer
+        ))
+      )
+    "equal"))
+
+(let ((n 2))
+(is-left-smaller (elt (elt input n) 0) (elt (elt input n) 1))
+;(is-left-smaller '(2) '((0 0 0)) )
+)
+#+end_src
+
+#+RESULTS:
+
+The function for the solution is easy then:
+Just loop over pairs, check order and increase counter if valid.
+
+#+begin_src elisp :exports both
+(defun solve-13-1 (filename)
+(let ((data (read-input filename))(counter 0))
+  (dolist (i (number-sequence 0 (- (length data) 1)))
+    (let* ((pair (elt data i))(smaller nil)(left (elt pair 0))(right (elt pair 1))(j (+ i 1)))
+      (setq smaller (is-left-smaller left right))
+      (if (equal smaller t)(setq counter (+ counter j)))))
+  counter))
+(solve-13-1 "../data/day13/dummy-input")
+#+end_src
+
+#+RESULTS:
+: 13
+
+#+begin_src elisp :exports both
+(solve-13-1 "../data/day13/input")
+#+end_src
+
+#+RESULTS:
+: 5659
+
+* Part 2
+There are two approaches here:
+- Efficient:
+  + No sorting at all
+  + Just see how many elements are smaller than dividers
+  + Compare dividers with all (Could even avoid comparing twice on those smaller the first one)
+- Intuitive and imo nice:
+  + Implement comparison (almost done in a)
+  + Append dividers to data
+  + Sort data according to rules of puzzle
+  + See where the dividers end up
+
+I implemented the second one as comparison is almost done already.
+The only thing needed is to map ~"equal"~ to ~nil~ so that it really only has a boolean result.
+This is done in [[comparison]].
+
+One more small thing needed: I read the input as a list of pairs, now we need all elements
+individually, so we need to flatten by one level. See [[flatten]] for the implementation of that.
+
+#+name: comparison
+#+begin_src elisp
+(defun smaller-wrapper (left right)
+  (let ((result nil))
+    (setq result (is-left-smaller left right))
+    (if (equal result t) t nil)))
+#+end_src
+
+#+RESULTS: comparison
+: smaller-wrapper
+
+
+#+name: flatten
+#+begin_src elisp
+(defun flatten (data)
+  (let ((new '()))
+    (dolist (pair data)
+      (dolist (element pair)
+        (push element new)))
+    (reverse new)))
+#+end_src
+
+#+RESULTS: flatten
+: flatten
+
+
+Then put it together in one function like described above:
+
+#+begin_src elisp :exports both
+(defun solve-13-2 (filename)
+(let ((data (read-input filename))(counter 0))
+  (push '((2)) data)
+  (push '((6)) data)
+  (setq data (flatten data))
+  ;; comparing the dividers with all might be more efficient, but I like this sort by any thing
+  (setq data (sort data 'smaller-wrapper))
+  (let ((smaller-first 0)(smaller-second 0)(counter 0))
+    (dolist (element data)
+      (incf counter)
+      (cond
+       ((equal element '(2))(setq smaller-first counter))
+       ((equal element '(6))(setq smaller-second counter))))
+   (* smaller-first smaller-second))))
+(solve-13-2 "../data/day13/dummy-input")
+#+end_src
+
+#+RESULTS:
+: 140
+
+Run on the full input:
+
+#+begin_src elisp :exports both :exports both
+(solve-13-2 "../data/day13/input")
+#+end_src
+
+#+RESULTS:
+: 22110

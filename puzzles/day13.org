@@ -8,7 +8,9 @@ input can also be put into elisp eval.
 Just replace
 #+begin_quote
 "," -> " "
+
 "[" -> "("
+
 "]" -> ")"
 #+end_quote
 
@@ -170,12 +172,12 @@ There are two approaches here:
 
 I implemented the second one as comparison is almost done already.
 The only thing needed is to map ~"equal"~ to ~nil~ so that it really only has a boolean result.
-This is done in [[comparison]].
+This is done in [[smaller-wrapper]].
 
 One more small thing needed: I read the input as a list of pairs, now we need all elements
 individually, so we need to flatten by one level. See [[flatten]] for the implementation of that.
 
-#+name: comparison
+#+name: smaller-wrapper
 #+begin_src elisp
 (defun smaller-wrapper (left right)
   (let ((result nil))

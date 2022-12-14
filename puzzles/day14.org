@@ -1,0 +1,253 @@
+#+title: Day14
+#+PROPERTY: header-args :session Day14 :exports both
+
+* Part 1
+#+begin_src elisp :exports both
+(defun read-input (filename)
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (let ((result '())(line "")(items nil)(split nil)(grid '())(x-range nil)(y-range nil))
+      (while (not (eobp))
+        (let ((beg (point)))
+          (move-end-of-line nil)
+          (setq line (buffer-substring beg (point)))
+
+          (setq split (split-string line "->"))
+          (dolist (item split)
+            (let* ((pos (split-string item ","))(x (string-to-number (elt pos 0)))(y (string-to-number (elt pos 1))))
+              (push (cons x y) items)
+              (if (equal x-range nil)(setq x-range (cons x x)))
+              (if (equal y-range nil)(setq y-range (cons 0 y)))
+              (cond
+               ((< x (car x-range))(setcar x-range x))
+               ((> x (cdr x-range))(setcdr x-range x)))
+              (cond
+               ((< y (car y-range))(setcar y-range y))
+               ((> y (cdr y-range))(setcdr y-range y)))
+              ))
+          (push (reverse items) result)
+          (setq items '())
+          (forward-char)))
+      (list (nreverse result) x-range y-range))))
+
+(setq dummy-input (read-input "../data/day14/dummy-input"))
+(pp (elt dummy-input 0))
+#+end_src
+
+#+RESULTS:
+: (((498 . 4)
+:   (498 . 6)
+:   (496 . 6))
+:  ((503 . 4)
+:   (502 . 4)
+:   (502 . 9)
+:   (494 . 9)))
+
+#+begin_src elisp
+(-last-item (elt (elt dummy-input 0) 0))
+#+end_src
+
+#+RESULTS:
+: (496 . 6)
+
+
+
+#+begin_src elisp
+(defun create-grid (data &optional upper-left lower-right floor x-shift)
+  (let* ((paths (elt data 0))(x (elt data 1))(y (elt data 2))(current nil)(width (+ 1 (- (cdr x) (car x))))(height (+ 1 (- (cdr y) (car y)))))
+    (if (and upper-left lower-right) (progn
+                                  (setq width (- (car lower-right) (car upper-left)))
+                                  (setq height (- (cdr lower-right) (cdr upper-left)))))
+
+    (message "%s %s" upper-left lower-right)
+    (setq grid (make-vector width nil))
+    (dotimes (i width)
+      (setf (aref grid i)(make-vector height "."))
+      (if floor (setf (aref (aref grid i) (- height 1)) "#"))
+      )
+    (if (not x-shift)(setq x-shift 0))
+
+    (dolist (path paths)
+      (setq current (cons (car (elt path 0)) (cdr (elt path 0))))
+      (dolist (element path)
+        (while (not (equal current element))
+        (let* ((old-x (car current))(old-y (cdr current))(new-x (car element))(new-y (cdr element))(dx (- new-x old-x))(dy (- new-y old-y)))
+            (let ((a (- (car current) (car x) (- x-shift)))(b (- (cdr current) (car y))))
+              (setf (elt (elt grid a) b) "#")
+              )
+            (cond
+             ((> dx 0)(setcar current (+ (car current) 1)))
+             ((< dx 0)(setcar current (- (car current) 1)))
+             ((> dy 0)(setcdr current (+ (cdr current) 1)))
+             ((< dy 0)(setcdr current (- (cdr current) 1))))
+            )
+          ))
+      (setf (elt (elt grid (- (car (-last-item path)) (car x)(- x-shift))) (cdr (-last-item path))) "#")) ; add last element of chain
+    (setf (elt (elt grid (- 500 (car x))) 0) "+")
+    grid
+    ))
+
+(setq grid (create-grid dummy-input (cons 0 0) (cons 50 20) t 2))
+(pp grid)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+[["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "#" "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "#" "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["+" "." "." "." "#" "#" "#" "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "#" "#" "#" "#" "#" "#" "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "#" "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]
+ ["." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "." "#"]]
+#+end_example
+
+#+begin_src elisp
+(defun let-sand-fall (cave start-point) ; TODO + as start point
+  (let ((sand-position start-point)(can-move t))
+  (while (equal can-move t)
+    (let ((x (car sand-position))(y (cdr sand-position)))
+    (if (or (<= x 0) (>= x (length cave))(> y (length (elt cave 0))))(progn (setq can-move nil)(setq sand-position nil)) ; wie funktioniert die linke grenze?
+    (cond
+     ((>= y (- (length (elt cave 0)) 1))(setq can-move nil)(setq sand-position nil)) ; is on last row -> abyss
+     ((equal (elt (elt cave x)(+ y 1)) ".") (setq sand-position (cons x (+ y 1)))) ;straight
+     ((>= x (- (length cave) 1))(setq can-move nil)(setq sand-position nil)) ; falls diagonally into abyss
+     ((equal (elt (elt cave (- x 1))(+ y 1)) ".") (setq sand-position (cons (- x 1) (+ y 1)))) ;diagonal right
+     ((<= x 0)(setq can-move nil)(setq sand-position nil)) ; falls diagonally into abyss
+     ((equal (elt (elt cave (+ x 1))(+ y 1)) ".") (setq sand-position (cons (+ x 1) (+ y 1)))) ;diagonal left
+     (t (setq can-move nil)) ; stcuk
+     )
+  )
+))
+  sand-position))
+
+(let-sand-fall grid (cons (- 500 494) 0) )
+#+end_src
+
+#+RESULTS:
+: (6 . 169)
+
+#+begin_src elisp
+(defun solve-14-1 (filepath)
+  (let* ((data (read-input filepath))(cave (create-grid data))(abyss nil)(n 0))
+    (message "%s %s" (length cave) (length (elt cave 0)))
+    (while (not abyss)
+      (let ((new-sand (let-sand-fall cave (cons (- 500 (car (elt data 1))) 0))))
+        (if new-sand (progn (setf (elt (elt cave (car new-sand)) (cdr new-sand)) "o")(incf n))(setq abyss t))
+        ))
+    n
+    ))
+
+(solve-14-1 "../data/day14/dummy-input")
+#+end_src
+
+#+RESULTS:
+: 24
+
+#+begin_src elisp
+(solve-14-1 "../data/day14/input")
+#+end_src
+
+#+RESULTS:
+: 892
+
+#+begin_src elisp
+(setq input (read-input "../data/day14/input"))
+(setq grid (create-grid input))
+(list (length (elt grid 34)) (length grid))
+#+end_src
+
+#+RESULTS:
+| 169 | 52 |
+
+
+#+begin_src elisp
+(length (elt dummy-input 0))
+#+end_src
+
+#+RESULTS:
+: 2
+
+
+
+* Part 2
+#+begin_src elisp
+(defun solve-14-2 (filepath h width)
+  (let* ((shift (/ width 2)) (data (read-input filepath))(cave (create-grid data (cons 0 0) (cons width h) t shift))(abyss nil)(n 0)(fake-cave '())(width 20)(height 11)(source (cons (- 500 (car (elt data 1)) (- shift)) 0)) )
+   ;(setf (elt data 0)(elt data 0))
+    (message "%s %s" (length cave) (length (elt cave 0)))
+    (while (not abyss)
+      (let ((new-sand (let-sand-fall cave source)))
+        (if new-sand (progn (setf (elt (elt cave (car new-sand)) (cdr new-sand)) "o")(incf n))(setq abyss t))
+;        (if (> n 50)(setq abyss t))
+        (if (equal (elt (elt cave (car source)) (cdr source)) "o") (setq abyss t))
+        ))
+
+    (message "Source: %s %s" source (elt (elt cave (car source)) (cdr source)))
+    n
+    ))
+
+(solve-14-2 "../data/day14/dummy-input" 12 200)
+#+end_src
+
+#+RESULTS:
+: 93
+
+#+begin_src elisp
+(solve-14-2 "../data/day14/input" 171 500)
+#+end_src
+
+#+RESULTS:
+: 27155
+
+#+begin_src elisp
+(let ((m 0))
+  (dolist (row input)
+    (dolist (col row)
+      (message "%s" row)
+      (if (> (cdr (car col)) m) (setq m (cdr (car col))))))
+  m)
+#+end_src
